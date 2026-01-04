@@ -8,6 +8,13 @@ if [[ ! -x "$ROOT_DIR/bin/rnaview" ]]; then
   bash "$ROOT_DIR/tools/build_legacy_rnaview.sh"
 fi
 
+bash "$ROOT_DIR/tools/cargo_sysroot.sh" test --manifest-path "$ROOT_DIR/rust/Cargo.toml"
+python3 -m unittest discover -s "$ROOT_DIR/tools" -p "test_*.py"
+
+echo "== legacy engine ==" >&2
+bash "$ROOT_DIR/test.sh"
+
+echo "== rust engine ==" >&2
 OUT_DIR="$(mktemp -d)"
 if python3 "$ROOT_DIR/tools/rnaview_batch.py" run \
   test/pdb/pdb1nvy/pdb1nvy.pdb \
@@ -25,6 +32,7 @@ if python3 "$ROOT_DIR/tools/rnaview_batch.py" run \
   test/mmcif/x-ray/434D/assembly-2/434d-assembly2.cif \
   test/mmcif/x-ray/4NMG/assembly-1/4nmg-assembly1.cif \
   --out-dir "$OUT_DIR" \
+  --engine rust \
   --regress \
   --keep-going; then
   rm -rf "$OUT_DIR"
@@ -33,3 +41,4 @@ fi
 
 echo "FAILED: outputs kept at $OUT_DIR" >&2
 exit 1
+
