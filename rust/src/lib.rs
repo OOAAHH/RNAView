@@ -4,6 +4,8 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 mod structure;
+#[cfg(feature = "legacy-ffi")]
+mod legacy_ffi;
 pub use structure::{parse_structure_bases, BaseResidue};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -613,6 +615,9 @@ mod tests {
             let core = extract_core_from_out_path(&out_path).expect("parse .out core");
             let total_bases = core.stats.total_bases.expect("stats.total_bases");
             if bases.len() != total_bases as usize {
+                let unfiltered = super::structure::parse_structure_nucleic_residues(&structure_path)
+                    .map(|v| v.len())
+                    .unwrap_or(0);
                 let tail = bases
                     .iter()
                     .rev()
@@ -621,9 +626,10 @@ mod tests {
                     .collect::<Vec<_>>();
                 let has_b107 = bases.iter().any(|b| b.chain == 'B' && b.resseq == 107);
                 panic!(
-                    "base count mismatch for {out_rel}; got {} want {}; has B:107? {}; tail={:?}",
+                    "base count mismatch for {out_rel}; got {} want {}; unfiltered={}; has B:107? {}; tail={:?}",
                     bases.len(),
                     total_bases,
+                    unfiltered,
                     has_b107,
                     tail
                 );

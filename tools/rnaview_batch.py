@@ -241,9 +241,33 @@ def _find_rust_hotcore_binary(repo: Path) -> Path | None:
     return None
 
 
+def _rust_hotcore_needs_rebuild(repo: Path, binary: Path) -> bool:
+    try:
+        bin_mtime = binary.stat().st_mtime
+    except OSError:
+        return True
+
+    candidates: list[Path] = [
+        repo / "rust" / "Cargo.toml",
+        repo / "rust" / "Cargo.lock",
+    ]
+    src_dir = repo / "rust" / "src"
+    if src_dir.exists():
+        candidates.extend(sorted(src_dir.glob("*.rs")))
+
+    for p in candidates:
+        try:
+            if p.exists() and p.stat().st_mtime > bin_mtime:
+                return True
+        except OSError:
+            continue
+
+    return False
+
+
 def _ensure_rust_hotcore_binary(repo: Path) -> Path:
     found = _find_rust_hotcore_binary(repo)
-    if found is not None:
+    if found is not None and not _rust_hotcore_needs_rebuild(repo, found):
         return found
 
     cargo = shutil.which("cargo")
@@ -275,6 +299,7 @@ def _run_one_legacy(
     job_id_mode: str,
     ps: bool,
     overwrite: bool,
+    rnaview_bin: Path,
     out_core_mod: Any,
     pairs_mod: Any,
     regress_index: RegressIndex | None,
@@ -282,7 +307,6 @@ def _run_one_legacy(
     keep_going: bool,
 ) -> JobResult:
     repo = _repo_root()
-    rnaview_bin = repo / "bin" / "rnaview"
     job_id = _job_id_for_input(input_path, job_id_mode)
     job_dir = (out_dir / job_id).resolve()
     job_dir.mkdir(parents=True, exist_ok=True)
@@ -445,6 +469,7 @@ def _run_one_rust(
     overwrite: bool,
     rust_bin: Path,
     legacy_bin: Path,
+    mmcif_parser: str,
     out_core_mod: Any,
     regress_index: RegressIndex | None,
     max_diffs: int,
@@ -490,6 +515,8 @@ def _run_one_rust(
         str(input_path),
         "--format",
         fmt,
+        "--mmcif-parser",
+        str(mmcif_parser),
         "--legacy-bin",
         str(legacy_bin),
         "--rnaview-root",
@@ -629,9 +656,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
         return 2
 
     repo = _repo_root()
-    legacy_bin = repo / "bin" / "rnaview"
-    if not legacy_bin.exists():
-        sys.stderr.write(f"missing legacy binary: {legacy_bin} (build via tools/build_legacy_rnaview.sh)\n")
+    rnaview_bin = Path(args.rnaview_bin).resolve() if args.rnaview_bin else (repo / "bin" / "rnaview")
+    if not rnaview_bin.exists():
+        sys.stderr.write(f"missing rnaview binary: {rnaview_bin} (build via tools/build_legacy_rnaview.sh)\n")
         return 2
 
     regress_index: RegressIndex | None = None
@@ -666,6 +693,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
                     job_id_mode=args.job_id_mode,
                     ps=bool(args.ps),
                     overwrite=bool(args.overwrite),
+                    rnaview_bin=rnaview_bin,
                     out_core_mod=out_core_mod,
                     pairs_mod=pairs_mod,
                     regress_index=regress_index,
@@ -684,7 +712,8 @@ def _cmd_run(args: argparse.Namespace) -> int:
                     job_id_mode=args.job_id_mode,
                     overwrite=bool(args.overwrite),
                     rust_bin=rust_bin,
-                    legacy_bin=legacy_bin,
+                    legacy_bin=rnaview_bin,
+                    mmcif_parser=str(getattr(args, "mmcif_parser", "legacy")),
                     out_core_mod=out_core_mod,
                     regress_index=regress_index,
                     max_diffs=int(args.max_diffs),
@@ -740,6 +769,13 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--out-dir", required=True, help="Output directory")
     run.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) // 2), help="Parallel workers")
     run.add_argument("--engine", choices=["legacy", "rust"], default="legacy", help="Which engine to run")
+    run.add_argument("--rnaview-bin", default=None, help="Path to rnaview binary (default: bin/rnaview)")
+    run.add_argument(
+        "--mmcif-parser",
+        choices=["legacy", "pdbtbx"],
+        default="legacy",
+        help="For --engine rust: use legacy RNAVIEW mmCIF parsing, or convert via pdbtbx then run legacy PDB parser",
+    )
     run.add_argument(
         "--job-id-mode",
         choices=["stem-hash", "name-hash", "stem", "name"],

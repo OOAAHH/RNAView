@@ -3,7 +3,15 @@ name = "rnaview-hotcore"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "rnaview_hotcore"
+crate-type = ["rlib", "staticlib"]
+
+[features]
+legacy-ffi = []
+
 [dependencies]
+libc = "0.2"
 pdbtbx = { version = "0.12", default-features = false, features = ["compression"] }
 regex = "1"
 serde = { version = "1", features = ["derive"] }

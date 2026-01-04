@@ -2,7 +2,7 @@ use pdbtbx::{
     ContainsAtomConformer, ContainsAtomConformerResidue, ContainsAtomConformerResidueChain,
     Format, ReadOptions, StrictnessLevel,
 };
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -15,7 +15,7 @@ pub struct BaseResidue {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct ResidueKey {
-    chain: char,
+    chain_id: String,
     resseq: i32,
     insertion_code: Option<char>,
     resname: String,
@@ -23,7 +23,6 @@ struct ResidueKey {
 
 #[derive(Debug, Clone)]
 struct AtomRec {
-    serial: usize,
     name: String,
     x: f64,
     y: f64,
@@ -151,16 +150,7 @@ fn base_from_resname_or_infer(resname: &str, ry: i32, atoms: &[AtomRec]) -> char
     }
 }
 
-fn is_explicit_nucleotide_resname(resname: &str) -> bool {
-    matches!(
-        resname,
-        "A" | "ADE" | "G" | "GUA" | "U" | "URA" | "C" | "CYT" | "T" | "THY" | "I" | "INO"
-            | "P"
-            | "PSU"
-    )
-}
-
-fn parse_structure_to_nucleic_residues(
+pub(crate) fn parse_structure_nucleic_residues(
     path: &Path,
 ) -> std::io::Result<Vec<BaseResidue>> {
     let mut opts = ReadOptions::new();
@@ -193,7 +183,7 @@ fn parse_structure_to_nucleic_residues(
 
     let mut groups: HashMap<ResidueKey, BTreeMap<usize, AtomRec>> = HashMap::new();
     for h in pdb.atoms_with_hierarchy() {
-        let chain = h.chain().id().chars().next().unwrap_or(' ');
+        let chain_id = h.chain().id().to_string();
         let resseq = i32::try_from(h.residue().serial_number()).unwrap_or(9999);
         let insertion_code = h
             .residue()
@@ -205,7 +195,7 @@ fn parse_structure_to_nucleic_residues(
         }
 
         let key = ResidueKey {
-            chain,
+            chain_id,
             resseq,
             insertion_code,
             resname,
@@ -213,7 +203,6 @@ fn parse_structure_to_nucleic_residues(
         let serial = h.atom().serial_number();
         let atoms = groups.entry(key).or_insert_with(BTreeMap::new);
         atoms.entry(serial).or_insert_with(|| AtomRec {
-            serial,
             name: canonical_atom_name(h.atom().name()),
             x: h.atom().x(),
             y: h.atom().y(),
@@ -221,36 +210,109 @@ fn parse_structure_to_nucleic_residues(
         });
     }
 
-    let mut explicit_nuc_serials: HashMap<(char, i32, Option<char>), HashSet<usize>> =
-        HashMap::new();
-    for (key, atoms) in &groups {
-        if !is_explicit_nucleotide_resname(&key.resname) {
-            continue;
-        }
-        explicit_nuc_serials
-            .entry((key.chain, key.resseq, key.insertion_code))
+    let mut by_res_id: HashMap<(String, i32, Option<char>), Vec<ResidueKey>> = HashMap::new();
+    for key in groups.keys() {
+        by_res_id
+            .entry((key.chain_id.clone(), key.resseq, key.insertion_code))
             .or_default()
-            .extend(atoms.keys().copied());
+            .push(key.clone());
     }
 
-    let mut entries: Vec<(usize, ResidueKey, Vec<AtomRec>)> = Vec::new();
-    for (key, mut atoms_by_serial) in groups {
-        if !is_explicit_nucleotide_resname(&key.resname) {
-            if let Some(nuc) = explicit_nuc_serials.get(&(key.chain, key.resseq, key.insertion_code))
-            {
-                if !nuc.is_empty() {
-                    atoms_by_serial.retain(|serial, _| !nuc.contains(serial));
+    let mut order_key: HashMap<ResidueKey, usize> = HashMap::new();
+    for (_res_id, keys) in &by_res_id {
+        if keys.len() <= 1 {
+            continue;
+        }
+        let mut serial_count: HashMap<usize, usize> = HashMap::new();
+        for key in keys {
+            if let Some(atoms) = groups.get(key) {
+                for serial in atoms.keys() {
+                    *serial_count.entry(*serial).or_insert(0) += 1;
                 }
             }
         }
-        if atoms_by_serial.is_empty() {
-            continue;
+
+        for key in keys {
+            let Some(atoms) = groups.get(key) else {
+                continue;
+            };
+            let Some(overall_min) = atoms.keys().next().copied() else {
+                continue;
+            };
+            let exclusive_min = atoms
+                .keys()
+                .filter(|s| serial_count.get(s).copied().unwrap_or(0) == 1)
+                .min()
+                .copied();
+            order_key.insert(key.clone(), exclusive_min.unwrap_or(overall_min));
         }
-        let min_serial = *atoms_by_serial.keys().next().expect("non-empty");
+
+        let mut best_key: Option<ResidueKey> = None;
+        let mut best_score: Option<(usize, usize, String)> = None;
+        for key in keys {
+            let Some(atoms) = groups.get(key) else {
+                continue;
+            };
+            let Some(overall_min) = atoms.keys().next().copied() else {
+                continue;
+            };
+            let exclusive_min = atoms
+                .keys()
+                .filter(|s| serial_count.get(s).copied().unwrap_or(0) == 1)
+                .min()
+                .copied();
+            let priority = if exclusive_min.is_some() { 0usize } else { 1usize };
+            let primary = exclusive_min.unwrap_or(overall_min);
+            let score = (priority, primary, key.resname.clone());
+            let is_better = match best_score.as_ref() {
+                None => true,
+                Some(b) => score < *b,
+            };
+            if is_better {
+                best_score = Some(score);
+                best_key = Some(key.clone());
+            }
+        }
+
+        let Some(owner) = best_key else {
+            continue;
+        };
+
+        for key in keys {
+            if key == &owner {
+                continue;
+            }
+            if let Some(atoms) = groups.get_mut(key) {
+                atoms.retain(|serial, _| serial_count.get(serial).copied().unwrap_or(0) == 1);
+            }
+        }
+    }
+
+    groups.retain(|_, atoms| !atoms.is_empty());
+
+    let mut entries: Vec<(usize, ResidueKey, Vec<AtomRec>)> = Vec::new();
+    for (key, atoms_by_serial) in groups {
+        let min_serial = order_key
+            .get(&key)
+            .copied()
+            .unwrap_or_else(|| *atoms_by_serial.keys().next().expect("non-empty"));
         let atoms: Vec<AtomRec> = atoms_by_serial.into_iter().map(|(_, a)| a).collect();
         entries.push((min_serial, key, atoms));
     }
-    entries.sort_by_key(|(min_serial, _, _)| *min_serial);
+    entries.sort_by(|a, b| {
+        (
+            a.0,
+            &a.1.chain_id,
+            a.1.resseq,
+            &a.1.resname,
+        )
+            .cmp(&(
+                b.0,
+                &b.1.chain_id,
+                b.1.resseq,
+                &b.1.resname,
+            ))
+    });
 
     let mut out: Vec<BaseResidue> = Vec::new();
     for (_min_serial, key, atoms) in entries {
@@ -259,8 +321,9 @@ fn parse_structure_to_nucleic_residues(
             continue;
         }
         let base = base_from_resname_or_infer(&key.resname, ry, &atoms);
+        let chain = key.chain_id.chars().next().unwrap_or(' ');
         out.push(BaseResidue {
-            chain: key.chain,
+            chain,
             resseq: key.resseq,
             insertion_code: key.insertion_code,
             base,
@@ -271,7 +334,7 @@ fn parse_structure_to_nucleic_residues(
 }
 
 pub fn parse_structure_bases(path: &Path) -> std::io::Result<Vec<BaseResidue>> {
-    let residues = parse_structure_to_nucleic_residues(path)?;
+    let residues = parse_structure_nucleic_residues(path)?;
     let mut out: Vec<BaseResidue> = Vec::new();
 
     let mut idx = 0usize;
