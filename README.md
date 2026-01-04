@@ -1,3 +1,7 @@
+# 现代化升级
+- 逐步使用rust和python对原来的结构进行替换
+
+---------------------------
 # RNAView
 
 RNAView identifies base pairs that are formed in nucleic acid structures and classifies them according to the system of Leontis and Westhof. The software presented here was originally described in Yang, H., Jossinet, F., Leontis, N., Chen, L., Westbrook, J., Berman, H.M., Westhof, E. (2003). Tools for the automatic identification and classification of RNA base pairs. Nucleic Acids Research 31.13: 3450-3460, https://doi.org/10.1093/nar/gkg529
@@ -78,3 +82,4 @@ The program will automatically pick the best NMR model according to the REMARK r
 
 ## Update
 Nov 21, 2023: RNAVIEW permits MMCIF inputs.
+
