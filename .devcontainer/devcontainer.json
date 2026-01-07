@@ -1,0 +1,5 @@
+{
+  "name": "My Local Dev Container",
+  "image": "ooaahhdocker/micromambarust:1.0",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}"
+}

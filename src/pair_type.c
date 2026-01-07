@@ -13,6 +13,7 @@ void get_orientation_SS(long i, long j, long **seidx, char **AtomName,
 void test_orientation(long i, long j, long **seidx, char **AtomName,
                       double **xyz, long *n1, long *n2);
 
+#ifndef RNAVIEW_RUST_LW_PAIR_TYPE
 void LW_pair_type(long i, long j, double dist, long **seidx, char **AtomName,
                   char *HB_ATOM, double **xyz, char *bseq, char **hb_atom1,
                   char **hb_atom2, double *hb_dist, char *type)
@@ -55,6 +56,7 @@ void LW_pair_type(long i, long j, double dist, long **seidx, char **AtomName,
         strcat(type, cis_tran);
     }
 }
+#endif /* RNAVIEW_RUST_LW_PAIR_TYPE */
 void get_orientation_SS(long i, long j, long **seidx, char **AtomName,
                         double **xyz, char *type)
 {

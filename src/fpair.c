@@ -5,10 +5,133 @@
 #include <math.h>
 #include "nrutil.h"
 #include "rna.h"
+#include "rnaview_profile.h"
 
 extern long VERB;
 
 void LW_Saenger_correspond(char bs1, char bs2, char *type, char *corresp);
+
+#ifdef RNAVIEW_RUST_CANDIDATE_PAIRS
+extern long *rnaview_candidate_pairs_by_org(long num_residue, double **org, double **orien, double cutoff, double dv_max, long *out_len_pairs);
+#endif
+
+#ifdef RNAVIEW_RUST_CANDIDATE_PAIRS
+static long *RNAVIEW_BESTPAIR_ADJ_OFF = NULL;
+static long *RNAVIEW_BESTPAIR_ADJ = NULL;
+static long RNAVIEW_BESTPAIR_ADJ_N = 0;
+
+static int rnaview_cmp_long(const void *a, const void *b)
+{
+    long va = *(const long *)a;
+    long vb = *(const long *)b;
+    if (va < vb)
+        return -1;
+    if (va > vb)
+        return 1;
+    return 0;
+}
+
+void rnaview_bestpair_candidates_clear(void)
+{
+    if (RNAVIEW_BESTPAIR_ADJ_OFF)
+        free(RNAVIEW_BESTPAIR_ADJ_OFF);
+    if (RNAVIEW_BESTPAIR_ADJ)
+        free(RNAVIEW_BESTPAIR_ADJ);
+    RNAVIEW_BESTPAIR_ADJ_OFF = NULL;
+    RNAVIEW_BESTPAIR_ADJ = NULL;
+    RNAVIEW_BESTPAIR_ADJ_N = 0;
+}
+
+void rnaview_bestpair_candidates_build(long num_residue, double **org, double **orien, double cutoff, double dv_max)
+{
+    long cand_len = 0;
+    long *cand_pairs = NULL;
+    long *deg = NULL;
+    long *off = NULL;
+    long *pos = NULL;
+    long *adj = NULL;
+    long i;
+    long idx;
+    long edges;
+
+    rnaview_bestpair_candidates_clear();
+
+    cand_pairs = rnaview_candidate_pairs_by_org(num_residue, org, orien, cutoff, dv_max, &cand_len);
+    if (!cand_pairs || cand_len <= 0)
+        goto cleanup;
+
+    deg = (long *)calloc((size_t)(num_residue + 2), sizeof(long));
+    if (!deg)
+        goto cleanup;
+
+    for (idx = 0; idx < cand_len; idx++)
+    {
+        long a = cand_pairs[2 * idx];
+        long b = cand_pairs[2 * idx + 1];
+        if (a < 1 || a > num_residue || b < 1 || b > num_residue)
+            continue;
+        deg[a]++;
+        deg[b]++;
+    }
+
+    off = (long *)malloc((size_t)(num_residue + 2) * sizeof(long));
+    if (!off)
+        goto cleanup;
+    off[0] = 0;
+    off[1] = 0;
+    for (i = 1; i <= num_residue; i++)
+        off[i + 1] = off[i] + deg[i];
+    edges = off[num_residue + 1];
+    if (edges <= 0)
+        goto cleanup;
+
+    adj = (long *)malloc((size_t)edges * sizeof(long));
+    if (!adj)
+        goto cleanup;
+
+    pos = (long *)malloc((size_t)(num_residue + 2) * sizeof(long));
+    if (!pos)
+        goto cleanup;
+    memcpy(pos, off, (size_t)(num_residue + 2) * sizeof(long));
+
+    for (idx = 0; idx < cand_len; idx++)
+    {
+        long a = cand_pairs[2 * idx];
+        long b = cand_pairs[2 * idx + 1];
+        if (a < 1 || a > num_residue || b < 1 || b > num_residue)
+            continue;
+        adj[pos[a]++] = b;
+        adj[pos[b]++] = a;
+    }
+
+    for (i = 1; i <= num_residue; i++)
+    {
+        long start = off[i];
+        long end = off[i + 1];
+        long count = end - start;
+        if (count > 1)
+            qsort(adj + start, (size_t)count, sizeof(long), rnaview_cmp_long);
+    }
+
+    RNAVIEW_BESTPAIR_ADJ_OFF = off;
+    RNAVIEW_BESTPAIR_ADJ = adj;
+    RNAVIEW_BESTPAIR_ADJ_N = num_residue;
+    off = NULL;
+    adj = NULL;
+
+cleanup:
+    if (pos)
+        free(pos);
+    if (deg)
+        free(deg);
+    if (off)
+        free(off);
+    if (adj)
+        free(adj);
+    if (cand_pairs)
+        free(cand_pairs);
+}
+#endif
 
 void all_pairs(char *pdbfile, FILE *fout, long num_residue, long *RY,
                double **Nxyz, double **orien, double **org, double *BPRS,
@@ -26,9 +149,10 @@ void all_pairs(char *pdbfile, FILE *fout, long num_residue, long *RY,
     char str[256], **base_single, **base_sugar, **base_p, **other;
     long nb_single = 0, nb_sugar = 0, nb_p = 0, nb_other = 0, nc1, nc2;
     long bpid_lu = 0, i, ir, j, jr, k, num_bp = 0;
-    long nh, m, stack_key = 0, c_key, bone_key;
-    long **pair_info, *prot_rna, nh1 = 0, nh2 = 0, nnh = 0;
-    double rtn_val[21], HB_UPPER[2], *hb_dist, change, geo_check;
+	    long nh, m, stack_key = 0, c_key, bone_key;
+	    long **pair_info, *prot_rna, nh1 = 0, nh2 = 0, nnh = 0;
+	    double rtn_val[21], HB_UPPER[2], *hb_dist, change, geo_check;
+	    int prof = rnaview_profile_is_enabled();
 
     base_single = cmatrix(0, num_residue, 0, 120);
     base_sugar = cmatrix(0, num_residue, 0, 120);
@@ -118,13 +242,62 @@ void all_pairs(char *pdbfile, FILE *fout, long num_residue, long *RY,
 
     syn_or_anti(num_residue, AtomName, seidx, xyz, RY, sugar_syn);
 
-    for (i = 1; i < num_residue; i++)
     {
-        for (j = i + 1; j <= num_residue; j++)
-        {
+        long use_candidates = 0;
+        long cand_len = 0;
+        long *cand_pairs = NULL;
+        long cand_idx = 0;
 
-            ir = seidx[i][1];
-            jr = seidx[j][1];
+#ifdef RNAVIEW_RUST_CANDIDATE_PAIRS
+	        if (prof)
+	        {
+	            long long t0 = rnaview_profile_now_ns();
+	            cand_pairs = rnaview_candidate_pairs_by_org(num_residue, org, orien, BPRS[2], BPRS[3], &cand_len);
+	            RNAVIEW_PROFILE.all_pairs_candidate_ns += rnaview_profile_now_ns() - t0;
+	        }
+	        else
+	        {
+	            cand_pairs = rnaview_candidate_pairs_by_org(num_residue, org, orien, BPRS[2], BPRS[3], &cand_len);
+	        }
+	        if (cand_pairs && cand_len > 0)
+	        {
+	            use_candidates = 1;
+	            if (prof)
+	                RNAVIEW_PROFILE.cand_pairs = cand_len;
+	        }
+#endif
+
+	        i = 1;
+	        j = 2;
+	        while (1)
+	        {
+            if (use_candidates)
+            {
+                if (cand_idx >= cand_len)
+                    break;
+                i = cand_pairs[2 * cand_idx];
+                j = cand_pairs[2 * cand_idx + 1];
+                cand_idx++;
+            }
+            else
+            {
+                if (i >= num_residue)
+                    break;
+                if (j > num_residue)
+                {
+                    i++;
+                    j = i + 1;
+                    continue;
+                }
+            }
+
+	            {
+	                long break_pair_loop = 0;
+	            do
+	            {
+
+	            ir = seidx[i][1];
+	            jr = seidx[j][1];
 
             if (sugar_syn[i] == 1)
             {
@@ -149,8 +322,19 @@ void all_pairs(char *pdbfile, FILE *fout, long num_residue, long *RY,
                 strcpy(syn_j, "  ");
             }
 
-            check_pairs(i, j, bseq, seidx, xyz, Nxyz, orien, org,
-                        AtomName, BPRS, rtn_val, &bpid_lu, 0);
+	            if (prof)
+	            {
+	                long long t0 = rnaview_profile_now_ns();
+	                check_pairs(i, j, bseq, seidx, xyz, Nxyz, orien, org,
+	                            AtomName, BPRS, rtn_val, &bpid_lu, 0);
+	                RNAVIEW_PROFILE.all_pairs_check_pairs_ns += rnaview_profile_now_ns() - t0;
+	                RNAVIEW_PROFILE.all_pairs_check_pairs_calls++;
+	            }
+	            else
+	            {
+	                check_pairs(i, j, bseq, seidx, xyz, Nxyz, orien, org,
+	                            AtomName, BPRS, rtn_val, &bpid_lu, 0);
+	            }
             /* here at least one good NO H bond (donor and acceptor)*/
 
             if (bpid_lu)
@@ -170,8 +354,19 @@ void all_pairs(char *pdbfile, FILE *fout, long num_residue, long *RY,
                 */
                 c_key = 1;
                 bone_key = 0;
-                Hbond_pair(i, j, seidx, AtomName, bseq, xyz, change,
-                           &nh, hb_atom1, hb_atom2, hb_dist, c_key, bone_key);
+                if (prof)
+                {
+                    long long t0 = rnaview_profile_now_ns();
+                    Hbond_pair(i, j, seidx, AtomName, bseq, xyz, change,
+                               &nh, hb_atom1, hb_atom2, hb_dist, c_key, bone_key);
+                    RNAVIEW_PROFILE.all_pairs_hbond_pair_ns += rnaview_profile_now_ns() - t0;
+                    RNAVIEW_PROFILE.all_pairs_hbond_pair_calls++;
+                }
+                else
+                {
+                    Hbond_pair(i, j, seidx, AtomName, bseq, xyz, change,
+                               &nh, hb_atom1, hb_atom2, hb_dist, c_key, bone_key);
+                }
 
                 /*   only distance  check
                   base_base_dist(i, j, seidx, AtomName, bseq, xyz, 3.8,
@@ -204,8 +399,19 @@ void all_pairs(char *pdbfile, FILE *fout, long num_residue, long *RY,
                     }
                     geo_check = 5.2; /*for edge to edge check, larger for single bond*/
 
-                    LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
-                                 bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                    if (prof)
+	                    {
+	                        long long t0 = rnaview_profile_now_ns();
+	                        LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
+	                                     bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                        RNAVIEW_PROFILE.all_pairs_lw_pair_type_ns += rnaview_profile_now_ns() - t0;
+	                        RNAVIEW_PROFILE.all_pairs_lw_pair_type_calls++;
+	                    }
+	                    else
+	                    {
+	                        LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
+	                                     bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                    }
 
                     /*
                 sprintf(tmp_str, "%c%c%c", type[0],type[2],type[4]);
@@ -241,9 +447,20 @@ void all_pairs(char *pdbfile, FILE *fout, long num_residue, long *RY,
                                 return;
                             }
 
-                            geo_check = 5.0;
-                            LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
-                                         bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                            geo_check = 5.0;
+	                            if (prof)
+	                            {
+	                                long long t0 = rnaview_profile_now_ns();
+	                                LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
+	                                             bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                                RNAVIEW_PROFILE.all_pairs_lw_pair_type_ns += rnaview_profile_now_ns() - t0;
+	                                RNAVIEW_PROFILE.all_pairs_lw_pair_type_calls++;
+	                            }
+	                            else
+	                            {
+	                                LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
+	                                             bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                            }
                             sprintf(str, "%9s, %c: %5ld %c-%c %5ld %c: %7s %c %s%s !1H(b_b).\n",
                                     work_num, ChainID[ir], ResSeq[ir], bseq[i], bseq[j],
                                     ResSeq[jr], ChainID[jr], type, pa_int, syn_i, syn_j);
@@ -252,9 +469,20 @@ void all_pairs(char *pdbfile, FILE *fout, long num_residue, long *RY,
                             continue;
                         }
 
-                        geo_check = 4.329; /*for edge to edge check*/
-                        LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
-                                     bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                        geo_check = 4.329; /*for edge to edge check*/
+	                        if (prof)
+	                        {
+	                            long long t0 = rnaview_profile_now_ns();
+	                            LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
+	                                         bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                            RNAVIEW_PROFILE.all_pairs_lw_pair_type_ns += rnaview_profile_now_ns() - t0;
+	                            RNAVIEW_PROFILE.all_pairs_lw_pair_type_calls++;
+	                        }
+	                        else
+	                        {
+	                            LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
+	                                         bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                        }
 
                         sprintf(tmp_str, "%c%c%c", type[0], type[2], type[4]);
 
@@ -268,9 +496,20 @@ void all_pairs(char *pdbfile, FILE *fout, long num_residue, long *RY,
                                 return;
                             }
 
-                            geo_check = 5.0;
-                            LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
-                                         bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                            geo_check = 5.0;
+	                            if (prof)
+	                            {
+	                                long long t0 = rnaview_profile_now_ns();
+	                                LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
+	                                             bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                                RNAVIEW_PROFILE.all_pairs_lw_pair_type_ns += rnaview_profile_now_ns() - t0;
+	                                RNAVIEW_PROFILE.all_pairs_lw_pair_type_calls++;
+	                            }
+	                            else
+	                            {
+	                                LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
+	                                             bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                            }
                             sprintf(str, "%9s, %c: %5ld %c-%c %5ld %c: %7s %c %s%s !1H(b_b).\n",
                                     work_num, ChainID[ir], ResSeq[ir], bseq[i], bseq[j],
                                     ResSeq[jr], ChainID[jr], type, pa_int, syn_i, syn_j);
@@ -303,16 +542,38 @@ void all_pairs(char *pdbfile, FILE *fout, long num_residue, long *RY,
                         }
                         else if (bpid_lu == 1 || bpid_lu == -1)
                         {                    /* non-W.C. cases */
-                            geo_check = 4.1; /*for edge to edge check*/
-                            LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
-                                         bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                            geo_check = 4.1; /*for edge to edge check*/
+	                            if (prof)
+	                            {
+	                                long long t0 = rnaview_profile_now_ns();
+	                                LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
+	                                             bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                                RNAVIEW_PROFILE.all_pairs_lw_pair_type_ns += rnaview_profile_now_ns() - t0;
+	                                RNAVIEW_PROFILE.all_pairs_lw_pair_type_calls++;
+	                            }
+	                            else
+	                            {
+	                                LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
+	                                             bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                            }
 
                             sprintf(tmp_str, "%c%c%c", type[0], type[2], type[4]);
                             if (strstr(tmp_str, ".") || strstr(tmp_str, "?"))
                             {
-                                geo_check = 4.3;
-                                LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
-                                             bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                                geo_check = 4.3;
+	                                if (prof)
+	                                {
+	                                    long long t0 = rnaview_profile_now_ns();
+	                                    LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
+	                                                 bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                                    RNAVIEW_PROFILE.all_pairs_lw_pair_type_ns += rnaview_profile_now_ns() - t0;
+	                                    RNAVIEW_PROFILE.all_pairs_lw_pair_type_calls++;
+	                                }
+	                                else
+	                                {
+	                                    LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
+	                                                 bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                                }
                             }
                         }
                     }
@@ -345,24 +606,26 @@ void all_pairs(char *pdbfile, FILE *fout, long num_residue, long *RY,
                     bs_pairs_tot[num_bp][2] = j;
                 }
 
-                if (++pair_info[i][NP] >= NP)
-                {
-                    printf("residue %s has over %ld pairs\n", b1,
-                           NP - 1);
-                    --pair_info[i][NP];
-                    break;
-                }
-                else
-                    pair_info[i][pair_info[i][NP]] = j;
-                if (++pair_info[j][NP] >= NP)
-                {
-                    printf("residue %s has over %ld pairs\n", b2,
-                           NP - 1);
-                    --pair_info[j][NP];
-                    break;
-                }
-                else
-                    pair_info[j][pair_info[j][NP]] = i;
+	                if (++pair_info[i][NP] >= NP)
+	                {
+	                    printf("residue %s has over %ld pairs\n", b1,
+	                           NP - 1);
+	                    --pair_info[i][NP];
+	                    break_pair_loop = 1;
+	                    break;
+	                }
+	                else
+	                    pair_info[i][pair_info[i][NP]] = j;
+	                if (++pair_info[j][NP] >= NP)
+	                {
+	                    printf("residue %s has over %ld pairs\n", b2,
+	                           NP - 1);
+	                    --pair_info[j][NP];
+	                    break_pair_loop = 1;
+	                    break;
+	                }
+	                else
+	                    pair_info[j][pair_info[j][NP]] = i;
             }
             else if (bpid_lu == 0)
             { /* not a H bond for base -  base */
@@ -378,7 +641,17 @@ void all_pairs(char *pdbfile, FILE *fout, long num_residue, long *RY,
                 if (rtn_val[3] > BPRS[4])
                     continue; /* angle between base normals */
 
-                base_stack(i, j, bseq, seidx, AtomName, xyz, rtn_val, &stack_key);
+	                if (prof)
+	                {
+	                    long long t0 = rnaview_profile_now_ns();
+	                    base_stack(i, j, bseq, seidx, AtomName, xyz, rtn_val, &stack_key);
+	                    RNAVIEW_PROFILE.all_pairs_base_stack_ns += rnaview_profile_now_ns() - t0;
+	                    RNAVIEW_PROFILE.all_pairs_base_stack_calls++;
+	                }
+	                else
+	                {
+	                    base_stack(i, j, bseq, seidx, AtomName, xyz, rtn_val, &stack_key);
+	                }
 
                 if (stack_key > 0)
                 { /*rid of base-base stacked case */
@@ -397,8 +670,19 @@ void all_pairs(char *pdbfile, FILE *fout, long num_residue, long *RY,
                 c_key = 0;
                 bone_key = 1;
                 change = 0; /*restrict tertiary interaction */
-                Hbond_pair(i, j, seidx, AtomName, bseq, xyz, change,
-                           &nh, hb_atom1, hb_atom2, hb_dist, c_key, bone_key);
+                if (prof)
+                {
+                    long long t0 = rnaview_profile_now_ns();
+                    Hbond_pair(i, j, seidx, AtomName, bseq, xyz, change,
+                               &nh, hb_atom1, hb_atom2, hb_dist, c_key, bone_key);
+                    RNAVIEW_PROFILE.all_pairs_hbond_pair_ns += rnaview_profile_now_ns() - t0;
+                    RNAVIEW_PROFILE.all_pairs_hbond_pair_calls++;
+                }
+                else
+                {
+                    Hbond_pair(i, j, seidx, AtomName, bseq, xyz, change,
+                               &nh, hb_atom1, hb_atom2, hb_dist, c_key, bone_key);
+                }
                 if (nh > 0)
                 {
                     nc1 = 0;
@@ -438,15 +722,37 @@ void all_pairs(char *pdbfile, FILE *fout, long num_residue, long *RY,
                             return;
                         }
 
-                        geo_check = 4.8;
-                        LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
-                                     bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                        geo_check = 4.8;
+	                        if (prof)
+	                        {
+	                            long long t0 = rnaview_profile_now_ns();
+	                            LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
+	                                         bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                            RNAVIEW_PROFILE.all_pairs_lw_pair_type_ns += rnaview_profile_now_ns() - t0;
+	                            RNAVIEW_PROFILE.all_pairs_lw_pair_type_calls++;
+	                        }
+	                        else
+	                        {
+	                            LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
+	                                         bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                        }
 
                         if (strstr(tmp_str, ".") || strstr(tmp_str, "?"))
                         {
-                            geo_check = 5.8;
-                            LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
-                                         bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                            geo_check = 5.8;
+	                            if (prof)
+	                            {
+	                                long long t0 = rnaview_profile_now_ns();
+	                                LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
+	                                             bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                                RNAVIEW_PROFILE.all_pairs_lw_pair_type_ns += rnaview_profile_now_ns() - t0;
+	                                RNAVIEW_PROFILE.all_pairs_lw_pair_type_calls++;
+	                            }
+	                            else
+	                            {
+	                                LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
+	                                             bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                            }
                         }
 
                         sprintf(base_sugar[nb_sugar], "%9s, %c: %5ld %c-%c %5ld %c: %7s %c %s%s !(b_s)\n",
@@ -463,15 +769,37 @@ void all_pairs(char *pdbfile, FILE *fout, long num_residue, long *RY,
                             return;
                         }
 
-                        geo_check = 4.8;
-                        LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
-                                     bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                        geo_check = 4.8;
+	                        if (prof)
+	                        {
+	                            long long t0 = rnaview_profile_now_ns();
+	                            LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
+	                                         bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                            RNAVIEW_PROFILE.all_pairs_lw_pair_type_ns += rnaview_profile_now_ns() - t0;
+	                            RNAVIEW_PROFILE.all_pairs_lw_pair_type_calls++;
+	                        }
+	                        else
+	                        {
+	                            LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
+	                                         bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                        }
 
                         if (strstr(tmp_str, ".") || strstr(tmp_str, "?"))
                         {
-                            geo_check = 5.8;
-                            LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
-                                         bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                            geo_check = 5.8;
+	                            if (prof)
+	                            {
+	                                long long t0 = rnaview_profile_now_ns();
+	                                LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
+	                                             bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                                RNAVIEW_PROFILE.all_pairs_lw_pair_type_ns += rnaview_profile_now_ns() - t0;
+	                                RNAVIEW_PROFILE.all_pairs_lw_pair_type_calls++;
+	                            }
+	                            else
+	                            {
+	                                LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
+	                                             bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                            }
                         }
 
                         sprintf(base_p[nb_p], "%9s, %c: %5ld %c-%c %5ld %c: %7s %c %s%s !b_(O1P,O2P)\n",
@@ -488,14 +816,36 @@ void all_pairs(char *pdbfile, FILE *fout, long num_residue, long *RY,
                             return;
                         }
 
-                        geo_check = 5.2;
-                        LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
-                                     bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                        geo_check = 5.2;
+	                        if (prof)
+	                        {
+	                            long long t0 = rnaview_profile_now_ns();
+	                            LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
+	                                         bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                            RNAVIEW_PROFILE.all_pairs_lw_pair_type_ns += rnaview_profile_now_ns() - t0;
+	                            RNAVIEW_PROFILE.all_pairs_lw_pair_type_calls++;
+	                        }
+	                        else
+	                        {
+	                            LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
+	                                         bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                        }
                         if (strstr(tmp_str, ".") || strstr(tmp_str, "?"))
                         {
-                            geo_check = 6.0;
-                            LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
-                                         bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                            geo_check = 6.0;
+	                            if (prof)
+	                            {
+	                                long long t0 = rnaview_profile_now_ns();
+	                                LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
+	                                             bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                                RNAVIEW_PROFILE.all_pairs_lw_pair_type_ns += rnaview_profile_now_ns() - t0;
+	                                RNAVIEW_PROFILE.all_pairs_lw_pair_type_calls++;
+	                            }
+	                            else
+	                            {
+	                                LW_pair_type(i, j, geo_check, seidx, AtomName, HB_ATOM, xyz,
+	                                             bseq, hb_atom1, hb_atom2, hb_dist, type);
+	                            }
                         }
 
                         sprintf(other[nb_other], "%9s, %c: %5ld %c-%c %5ld %c: %7s %c %s%s !(s_s)\n",
@@ -504,10 +854,35 @@ void all_pairs(char *pdbfile, FILE *fout, long num_residue, long *RY,
                     }
                 }
             }
-        }
+	            } while (0);
+
+	                if (break_pair_loop)
+	                {
+	                    if (use_candidates)
+	                    {
+	                        while (cand_idx < cand_len && cand_pairs[2 * cand_idx] == i)
+	                            cand_idx++;
+	                    }
+	                    else
+	                    {
+	                        i++;
+	                        j = i + 1;
+	                    }
+	                    continue;
+	                }
+	            }
+
+	            if (!use_candidates)
+	                j++;
+	        }
+
+#ifdef RNAVIEW_RUST_CANDIDATE_PAIRS
+        if (cand_pairs)
+            free(cand_pairs);
+#endif
     }
     /*
-printf("%d   %d  %d   %d \n",nb_single ,nb_sugar,nb_p,nb_other);
+	printf("%d   %d  %d   %d \n",nb_single ,nb_sugar,nb_p,nb_other);
     */
 
     for (m = 1; m <= nb_single; m++)
@@ -1199,30 +1574,62 @@ void best_pair(long i, long num_residue, long *RY, long **seidx,
 {
     double ddmin = XBIG, rtn_val[21];
     long bpid, j, k, nout = 16;
+    int prof = rnaview_profile_is_enabled();
 
     for (j = 1; j <= nout; j++)
         pair_stat[j] = 0;
 
-    for (j = 1; j <= num_residue; j++)
     {
-        if (j == i || RY[j] < 0 || matched_idx[j])
-            continue;
+        long start = 1;
+        long end = num_residue + 1;
+        long use_adj = 0;
+        long cand_idx;
 
-        /*
-    check_pair(i, j, bseq, seidx, xyz, Nxyz, orien, org, AtomName,
-               BPRS, rtn_val, &bpid, 0,criteria);
-        */
-
-        check_pairs(i, j, bseq, seidx, xyz, Nxyz, orien, org,
-                    AtomName, BPRS, rtn_val, &bpid, 0);
-
-        if (bpid && rtn_val[5] < ddmin)
+#ifdef RNAVIEW_RUST_CANDIDATE_PAIRS
+        if (RNAVIEW_BESTPAIR_ADJ_OFF && RNAVIEW_BESTPAIR_ADJ && RNAVIEW_BESTPAIR_ADJ_N == num_residue)
         {
-            ddmin = rtn_val[5];
-            pair_stat[1] = j;
-            pair_stat[2] = bpid;
-            for (k = 1; k <= 14; k++)
-                pair_stat[2 + k] = get_round(MFACTOR * rtn_val[k]);
+            start = RNAVIEW_BESTPAIR_ADJ_OFF[i];
+            end = RNAVIEW_BESTPAIR_ADJ_OFF[i + 1];
+            use_adj = 1;
+        }
+#endif
+
+        for (cand_idx = start; cand_idx < end; cand_idx++)
+        {
+#ifdef RNAVIEW_RUST_CANDIDATE_PAIRS
+            if (use_adj)
+                j = RNAVIEW_BESTPAIR_ADJ[cand_idx];
+            else
+                j = cand_idx;
+#else
+            j = cand_idx;
+#endif
+
+            if (j == i || RY[j] < 0 || matched_idx[j])
+                continue;
+
+            if (prof)
+            {
+                long long t0 = rnaview_profile_now_ns();
+                check_pairs(i, j, bseq, seidx, xyz, Nxyz, orien, org,
+                            AtomName, BPRS, rtn_val, &bpid, 0);
+                RNAVIEW_PROFILE.best_pair_check_pairs_ns += rnaview_profile_now_ns() - t0;
+                RNAVIEW_PROFILE.best_pair_check_pairs_calls++;
+            }
+            else
+            {
+                check_pairs(i, j, bseq, seidx, xyz, Nxyz, orien, org,
+                            AtomName, BPRS, rtn_val, &bpid, 0);
+            }
+
+            if (bpid && rtn_val[5] < ddmin)
+            {
+                ddmin = rtn_val[5];
+                pair_stat[1] = j;
+                pair_stat[2] = bpid;
+                for (k = 1; k <= 14; k++)
+                    pair_stat[2 + k] = get_round(MFACTOR * rtn_val[k]);
+            }
         }
     }
 }
@@ -1634,6 +2041,7 @@ void baseinfo(char chain_id, long res_seq, char iCode, char *rname,
                 bcode, rname_cp, snum, iCode, chain_id);
 }
 
+#ifndef RNAVIEW_RUST_CHECK_PAIRS
 void check_pairs(long i, long j, char *bseq, long **seidx, double **xyz,
                  double **Nxyz, double **orien, double **org, char **AtomName,
                  double *BPRS, double *rtn_val, long *bpid, long network)
@@ -1768,6 +2176,7 @@ void check_pairs(long i, long j, char *bseq, long **seidx, double **xyz,
         }
     }
 }
+#endif /* RNAVIEW_RUST_CHECK_PAIRS */
 
 void H_catalog(long i, long m, char *bseq, char **AtomName,
                long *without_H, long *with_H)
@@ -1911,6 +2320,7 @@ void H_catalog(long i, long m, char *bseq, char **AtomName,
     }
 }
 
+#ifndef RNAVIEW_RUST_HBOND_PAIR
 void Hbond_pair(long i, long j, long **seidx, char **AtomName, char *bseq,
                 double **xyz, double change, long *nh, char **hb_atom1,
                 char **hb_atom2, double *hb_dist, long c_key, long bone_key)
@@ -2098,6 +2508,7 @@ void Hbond_pair(long i, long j, long **seidx, char **AtomName, char *bseq,
 
     *nh = num_hbonds;
 }
+#endif /* RNAVIEW_RUST_HBOND_PAIR */
 
 void base_base_dist(long i, long j, long **seidx, char **AtomName, char *bseq,
                     double **xyz, double dist, long *nh, char **hb_atom1,

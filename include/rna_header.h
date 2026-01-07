@@ -376,6 +376,11 @@ void all_pairs(char *pdbfile, FILE *fout, long num_residue, long *RY,
                long *num_single_base, long *single_base, long *num_multi,
                long *multi_idx, long **multi, long *sugar_syn);
 
+#ifdef RNAVIEW_RUST_CANDIDATE_PAIRS
+void rnaview_bestpair_candidates_build(long num_residue, double **org, double **orien, double cutoff, double dv_max);
+void rnaview_bestpair_candidates_clear(void);
+#endif
+
 void best_pair(long i, long num_residue, long *RY, long **seidx,
                double **xyz, double **Nxyz, long *matched_idx,
                double **orien, double **org, char **AtomName, char *bseq,

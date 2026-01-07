@@ -9,10 +9,24 @@ if command -v make >/dev/null 2>&1 && command -v cc >/dev/null 2>&1; then
   exit 0
 fi
 
-APTROOT="${HOME}/.apt"
 TOOLCHAIN_DIR="${HOME}/.cache/rnaview-toolchain"
-DEBDIR="${TOOLCHAIN_DIR}/debs"
 SYSROOT="${TOOLCHAIN_DIR}/root"
+
+if [[ -x "${SYSROOT}/usr/bin/make" && -x "${SYSROOT}/usr/bin/gcc-14" ]]; then
+  export PATH="${SYSROOT}/usr/bin:${SYSROOT}/bin:${PATH}"
+  export LD_LIBRARY_PATH="${SYSROOT}/usr/lib/x86_64-linux-gnu:${SYSROOT}/lib/x86_64-linux-gnu:${SYSROOT}/usr/lib:${SYSROOT}/lib"
+
+  make \
+    CC="${SYSROOT}/usr/bin/gcc-14" \
+    CFLAGS="--sysroot=${SYSROOT} -isystem ${SYSROOT}/usr/include -isystem ${SYSROOT}/usr/include/x86_64-linux-gnu -Iinclude" \
+    LDFLAGS="--sysroot=${SYSROOT}"
+
+  echo "built: ${REPO_ROOT}/bin/rnaview"
+  exit 0
+fi
+
+APTROOT="${HOME}/.apt"
+DEBDIR="${TOOLCHAIN_DIR}/debs"
 
 mkdir -p "${APTROOT}/lists/partial" "${APTROOT}/cache/archives/partial"
 : > "${APTROOT}/status"
@@ -74,10 +88,10 @@ ln -sf gcc-14 "${SYSROOT}/usr/bin/cc" || true
 export PATH="${SYSROOT}/usr/bin:${SYSROOT}/bin:${PATH}"
 export LD_LIBRARY_PATH="${SYSROOT}/usr/lib/x86_64-linux-gnu:${SYSROOT}/lib/x86_64-linux-gnu:${SYSROOT}/usr/lib:${SYSROOT}/lib"
 
+cd "${REPO_ROOT}"
 make \
   CC="${SYSROOT}/usr/bin/gcc-14" \
   CFLAGS="--sysroot=${SYSROOT} -isystem ${SYSROOT}/usr/include -isystem ${SYSROOT}/usr/include/x86_64-linux-gnu -Iinclude" \
   LDFLAGS="--sysroot=${SYSROOT}"
 
 echo "built: ${REPO_ROOT}/bin/rnaview"
-

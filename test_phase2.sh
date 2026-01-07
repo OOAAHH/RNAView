@@ -8,11 +8,41 @@ if [[ ! -x "$ROOT_DIR/bin/rnaview" ]]; then
   bash "$ROOT_DIR/tools/build_legacy_rnaview.sh"
 fi
 
+bash "$ROOT_DIR/tools/build_rnaview_rustcore.sh"
+
 bash "$ROOT_DIR/tools/cargo_sysroot.sh" test --manifest-path "$ROOT_DIR/rust/Cargo.toml"
 python3 -m unittest discover -s "$ROOT_DIR/tools" -p "test_*.py"
 
 echo "== legacy engine ==" >&2
 bash "$ROOT_DIR/test.sh"
+
+echo "== rustcore (C pipeline, Rust hot functions) ==" >&2
+OUT_DIR="$(mktemp -d)"
+if python3 "$ROOT_DIR/tools/rnaview_batch.py" run \
+  test/pdb/pdb1nvy/pdb1nvy.pdb \
+  test/pdb/test1/test1.pdb \
+  test/pdb/tr0001/tr0001.pdb \
+  test/pdb/url064/url064.pdb \
+  test/pdb/urx053/urx053.pdb \
+  test/mmcif/insertion_code/1EFW/1EFW.cif \
+  test/mmcif/insertion_code/1VVJ/1VVJ.cif \
+  test/mmcif/insertion_code/4ARC/4ARC.cif \
+  test/mmcif/nmr_structure/8if5/8if5.cif \
+  test/mmcif/other/6pom/6pom.cif \
+  test/mmcif/x-ray/3P4J/assembly-1/3p4j-assembly1.cif \
+  test/mmcif/x-ray/434D/assembly-1/434d-assembly1.cif \
+  test/mmcif/x-ray/434D/assembly-2/434d-assembly2.cif \
+  test/mmcif/x-ray/4NMG/assembly-1/4nmg-assembly1.cif \
+  --out-dir "$OUT_DIR" \
+  --rnaview-bin "$ROOT_DIR/bin/rnaview_rustcore" \
+  --regress \
+  --regress-mode out \
+  --keep-going; then
+  rm -rf "$OUT_DIR"
+else
+  echo "FAILED: outputs kept at $OUT_DIR" >&2
+  exit 1
+fi
 
 echo "== rust engine ==" >&2
 OUT_DIR="$(mktemp -d)"
@@ -41,4 +71,3 @@ fi
 
 echo "FAILED: outputs kept at $OUT_DIR" >&2
 exit 1
-

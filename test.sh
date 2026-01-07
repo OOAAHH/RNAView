@@ -26,6 +26,7 @@ if python3 "$ROOT_DIR/tools/rnaview_batch.py" run \
   test/mmcif/x-ray/4NMG/assembly-1/4nmg-assembly1.cif \
   --out-dir "$OUT_DIR" \
   --regress \
+  --regress-mode out \
   --keep-going; then
   rm -rf "$OUT_DIR"
   exit 0

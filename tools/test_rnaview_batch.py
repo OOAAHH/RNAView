@@ -41,6 +41,8 @@ class TestBatchRunner(unittest.TestCase):
                     "--workers",
                     "1",
                     "--regress",
+                    "--regress-mode",
+                    "out",
                 ]
             )
             self.assertEqual(code, 0)
@@ -52,4 +54,3 @@ class TestBatchRunner(unittest.TestCase):
             job_dir = Path(res["job_dir"])
             self.assertTrue((job_dir / "pairs.json").exists())
             self.assertTrue((job_dir / "legacy.out").exists())
-

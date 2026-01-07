@@ -35,6 +35,7 @@ CFLAGS=(
   "-DRNAVIEW_RUST_CHECK_PAIRS"
   "-DRNAVIEW_RUST_HBOND_PAIR"
   "-DRNAVIEW_RUST_LW_PAIR_TYPE"
+  "-DRNAVIEW_RUST_CANDIDATE_PAIRS"
 )
 
 sources=(
@@ -42,6 +43,7 @@ sources=(
   "fpair.c"
   "fpair_sub.c"
   "pair_type.c"
+  "rnaview_profile.c"
   "nrutil.c"
   "ps-xy.c"
   "ps-xy-sub.c"

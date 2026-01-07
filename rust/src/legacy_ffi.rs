@@ -1,9 +1,10 @@
 #![allow(non_snake_case)]
 
-use libc::{c_char, c_double, c_long};
+use libc::{c_char, c_double, c_int, c_long, c_longlong};
 
 const WC_DORG: c_double = 2.5;
 const BUF512: c_long = 512;
+const XEPS: c_double = 1.0e-7;
 
 extern "C" {
     fn veclen(va: *mut c_double) -> c_double;
@@ -90,6 +91,11 @@ extern "C" {
         xyz: *mut *mut c_double,
         cis_tran: *mut c_char,
     );
+
+    fn rnaview_profile_is_enabled() -> c_int;
+    fn rnaview_profile_now_ns() -> c_longlong;
+    fn rnaview_profile_add_all_pairs_hbond_pair_h_catalog(delta_ns: c_longlong);
+    fn rnaview_profile_add_all_pairs_lw_get_hbond_ij(delta_ns: c_longlong);
 }
 
 fn to_ascii_upper(c: c_char) -> c_char {
@@ -385,6 +391,7 @@ pub unsafe extern "C" fn Hbond_pair(
     let mut with_h_m: c_long = 0;
     let mut without_h_n: c_long = 0;
     let mut with_h_n: c_long = 0;
+    let prof = rnaview_profile_is_enabled() != 0;
 
     for m in i_start..=i_end {
         let atom_m = mat_row(AtomName, m);
@@ -423,7 +430,13 @@ pub unsafe extern "C" fn Hbond_pair(
             }
         }
 
-        H_catalog(i, m, bseq, AtomName, &mut without_h_m, &mut with_h_m);
+        if prof {
+            let t0 = rnaview_profile_now_ns();
+            H_catalog(i, m, bseq, AtomName, &mut without_h_m, &mut with_h_m);
+            rnaview_profile_add_all_pairs_hbond_pair_h_catalog(rnaview_profile_now_ns() - t0);
+        } else {
+            H_catalog(i, m, bseq, AtomName, &mut without_h_m, &mut with_h_m);
+        }
 
         for n in j_start..=j_end {
             let atom_n = mat_row(AtomName, n);
@@ -472,7 +485,13 @@ pub unsafe extern "C" fn Hbond_pair(
                 continue;
             }
 
-            H_catalog(j, n, bseq, AtomName, &mut without_h_n, &mut with_h_n);
+            if prof {
+                let t0 = rnaview_profile_now_ns();
+                H_catalog(j, n, bseq, AtomName, &mut without_h_n, &mut with_h_n);
+                rnaview_profile_add_all_pairs_hbond_pair_h_catalog(rnaview_profile_now_ns() - t0);
+            } else {
+                H_catalog(j, n, bseq, AtomName, &mut without_h_n, &mut with_h_n);
+            }
             if without_h_m == 1 && without_h_n == 1 {
                 continue;
             }
@@ -572,25 +591,44 @@ pub unsafe extern "C" fn LW_pair_type(
     type_: *mut c_char,
 ) {
     *type_ = 0;
+    let prof = rnaview_profile_is_enabled() != 0;
     let mut cis_tran: [c_char; 10] = [0; 10];
 
     let mut hb_upper_new: [c_double; 3] = [0.0; 3];
     hb_upper_new[0] = dist;
 
     let mut nh: c_long = 0;
-    get_hbond_ij(
-        i,
-        j,
-        hb_upper_new.as_mut_ptr(),
-        seidx,
-        AtomName,
-        HB_ATOM,
-        xyz,
-        &mut nh,
-        hb_atom1,
-        hb_atom2,
-        hb_dist,
-    );
+    if prof {
+        let t0 = rnaview_profile_now_ns();
+        get_hbond_ij(
+            i,
+            j,
+            hb_upper_new.as_mut_ptr(),
+            seidx,
+            AtomName,
+            HB_ATOM,
+            xyz,
+            &mut nh,
+            hb_atom1,
+            hb_atom2,
+            hb_dist,
+        );
+        rnaview_profile_add_all_pairs_lw_get_hbond_ij(rnaview_profile_now_ns() - t0);
+    } else {
+        get_hbond_ij(
+            i,
+            j,
+            hb_upper_new.as_mut_ptr(),
+            seidx,
+            AtomName,
+            HB_ATOM,
+            xyz,
+            &mut nh,
+            hb_atom1,
+            hb_atom2,
+            hb_dist,
+        );
+    }
 
     get_pair_type(nh, hb_atom1, hb_atom2, i, j, bseq, type_);
 
@@ -610,20 +648,300 @@ pub unsafe extern "C" fn LW_pair_type(
     if tmp == *b"SWt\0" || tmp == *b"WSt\0" {
         *type_ = 0;
         hb_upper_new[0] = 5.1;
-        get_hbond_ij(
-            i,
-            j,
-            hb_upper_new.as_mut_ptr(),
-            seidx,
-            AtomName,
-            HB_ATOM,
-            xyz,
-            &mut nh,
-            hb_atom1,
-            hb_atom2,
-            hb_dist,
-        );
+        if prof {
+            let t0 = rnaview_profile_now_ns();
+            get_hbond_ij(
+                i,
+                j,
+                hb_upper_new.as_mut_ptr(),
+                seidx,
+                AtomName,
+                HB_ATOM,
+                xyz,
+                &mut nh,
+                hb_atom1,
+                hb_atom2,
+                hb_dist,
+            );
+            rnaview_profile_add_all_pairs_lw_get_hbond_ij(rnaview_profile_now_ns() - t0);
+        } else {
+            get_hbond_ij(
+                i,
+                j,
+                hb_upper_new.as_mut_ptr(),
+                seidx,
+                AtomName,
+                HB_ATOM,
+                xyz,
+                &mut nh,
+                hb_atom1,
+                hb_atom2,
+                hb_dist,
+            );
+        }
         get_pair_type(nh, hb_atom1, hb_atom2, i, j, bseq, type_);
         libc::strcat(type_, cis_tran.as_ptr());
     }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn rnaview_candidate_pairs_by_org(
+    num_residue: c_long,
+    org: *mut *mut c_double,
+    orien: *mut *mut c_double,
+    cutoff: c_double,
+    dv_max: c_double,
+    out_len_pairs: *mut c_long,
+) -> *mut c_long {
+    if out_len_pairs.is_null() {
+        return std::ptr::null_mut();
+    }
+    *out_len_pairs = 0;
+
+    if num_residue <= 1 || org.is_null() || orien.is_null() || !(cutoff > 0.0) || !(dv_max > 0.0) {
+        return std::ptr::null_mut();
+    }
+
+    let n = num_residue as usize;
+    let cell_size = cutoff;
+    let cutoff2 = cutoff * cutoff;
+    let eps = 1e-9;
+
+    let mut coords: Vec<[c_double; 3]> = vec![[0.0; 3]; n + 1];
+    let mut norm_z: Vec<[c_double; 3]> = vec![[0.0; 3]; n + 1];
+    let mut cell: Vec<[i64; 3]> = vec![[0; 3]; n + 1];
+    let mut min_cell: [i64; 3] = [i64::MAX; 3];
+    let mut max_cell: [i64; 3] = [i64::MIN; 3];
+
+    for i in 1..=n {
+        let row = mat_row(org, i as c_long);
+        let x = *row.add(1);
+        let y = *row.add(2);
+        let z = *row.add(3);
+        coords[i] = [x, y, z];
+
+        let ix = (x / cell_size).floor() as i64;
+        let iy = (y / cell_size).floor() as i64;
+        let iz = (z / cell_size).floor() as i64;
+        cell[i] = [ix, iy, iz];
+
+        let o = mat_row(orien, i as c_long);
+        norm_z[i] = [*o.add(7), *o.add(8), *o.add(9)];
+
+        if ix < min_cell[0] {
+            min_cell[0] = ix;
+        }
+        if iy < min_cell[1] {
+            min_cell[1] = iy;
+        }
+        if iz < min_cell[2] {
+            min_cell[2] = iz;
+        }
+        if ix > max_cell[0] {
+            max_cell[0] = ix;
+        }
+        if iy > max_cell[1] {
+            max_cell[1] = iy;
+        }
+        if iz > max_cell[2] {
+            max_cell[2] = iz;
+        }
+    }
+
+    let dx = (max_cell[0] - min_cell[0] + 1) as usize;
+    let dy = (max_cell[1] - min_cell[1] + 1) as usize;
+    let dz = (max_cell[2] - min_cell[2] + 1) as usize;
+
+    let Some(cell_count) = dx.checked_mul(dy).and_then(|v| v.checked_mul(dz)) else {
+        return std::ptr::null_mut();
+    };
+
+    let dv = |i: usize, j: usize| -> c_double {
+        let zi = norm_z[i];
+        let zj = norm_z[j];
+        let dd = zi[0] * zj[0] + zi[1] * zj[1] + zi[2] * zj[2];
+
+        let (mut z0, mut z1, mut z2) = if dd <= 0.0 {
+            (zi[0] - zj[0], zi[1] - zj[1], zi[2] - zj[2])
+        } else {
+            (zi[0] + zj[0], zi[1] + zj[1], zi[2] + zj[2])
+        };
+
+        let vlen = (z0 * z0 + z1 * z1 + z2 * z2).sqrt();
+        if vlen > XEPS {
+            z0 /= vlen;
+            z1 /= vlen;
+            z2 /= vlen;
+        }
+
+        let dx0 = coords[j][0] - coords[i][0];
+        let dx1 = coords[j][1] - coords[i][1];
+        let dx2 = coords[j][2] - coords[i][2];
+        (dx0 * z0 + dx1 * z1 + dx2 * z2).abs()
+    };
+
+    const MAX_CELLS: usize = 2_000_000;
+    if cell_count == 0 || cell_count > MAX_CELLS {
+        let mut pairs: Vec<c_long> = Vec::new();
+        let mut js: Vec<usize> = Vec::new();
+        let mut extra: Vec<usize> = Vec::new();
+        for i in 1..n {
+            js.clear();
+            extra.clear();
+            for j in (i + 1)..=n {
+                let di0 = coords[i][0] - coords[j][0];
+                let di1 = coords[i][1] - coords[j][1];
+                let di2 = coords[i][2] - coords[j][2];
+                let d2 = di0 * di0 + di1 * di1 + di2 * di2;
+                if d2 <= cutoff2 + eps {
+                    js.push(j);
+                }
+            }
+
+            js.sort_unstable();
+            js.dedup();
+
+            for &j in &js {
+                let dvj = dv(i, j);
+                if dvj > dv_max && dvj <= dv_max + 0.3 {
+                    for k in (i + 1..j).rev() {
+                        if dv(i, k) <= dv_max {
+                            extra.push(k);
+                            break;
+                        }
+                    }
+                }
+            }
+            js.extend(extra.iter().copied());
+
+            for j in (i + 1..=n).rev() {
+                if dv(i, j) <= dv_max {
+                    js.push(j);
+                    break;
+                }
+            }
+
+            js.sort_unstable();
+            js.dedup();
+            for &j in &js {
+                pairs.push(i as c_long);
+                pairs.push(j as c_long);
+            }
+        }
+        let pair_count = (pairs.len() / 2) as c_long;
+        if pair_count == 0 {
+            return std::ptr::null_mut();
+        }
+        let bytes = pairs.len() * std::mem::size_of::<c_long>();
+        let ptr = libc::malloc(bytes) as *mut c_long;
+        if ptr.is_null() {
+            return std::ptr::null_mut();
+        }
+        std::ptr::copy_nonoverlapping(pairs.as_ptr(), ptr, pairs.len());
+        *out_len_pairs = pair_count;
+        return ptr;
+    }
+
+    let mut head: Vec<i64> = vec![-1; cell_count];
+    let mut next: Vec<i64> = vec![-1; n + 1];
+
+    let idx_of = |c: [i64; 3]| -> usize {
+        let ox = (c[0] - min_cell[0]) as usize;
+        let oy = (c[1] - min_cell[1]) as usize;
+        let oz = (c[2] - min_cell[2]) as usize;
+        (ox * dy + oy) * dz + oz
+    };
+
+    for i in 1..=n {
+        let idx = idx_of(cell[i]);
+        next[i] = head[idx];
+        head[idx] = i as i64;
+    }
+
+    let mut pairs: Vec<c_long> = Vec::new();
+    let mut js: Vec<i64> = Vec::new();
+    let mut extra: Vec<i64> = Vec::new();
+
+    for i in 1..n {
+        js.clear();
+        extra.clear();
+        let ci = cell[i];
+        for ddx in -1..=1 {
+            let cx = ci[0] + ddx;
+            if cx < min_cell[0] || cx > max_cell[0] {
+                continue;
+            }
+            for ddy in -1..=1 {
+                let cy = ci[1] + ddy;
+                if cy < min_cell[1] || cy > max_cell[1] {
+                    continue;
+                }
+                for ddz in -1..=1 {
+                    let cz = ci[2] + ddz;
+                    if cz < min_cell[2] || cz > max_cell[2] {
+                        continue;
+                    }
+                    let idx = idx_of([cx, cy, cz]);
+                    let mut j = head[idx];
+                    while j != -1 {
+                        let ju = j as usize;
+                        if ju > i {
+                            let dx0 = coords[i][0] - coords[ju][0];
+                            let dx1 = coords[i][1] - coords[ju][1];
+                            let dx2 = coords[i][2] - coords[ju][2];
+                            let d2 = dx0 * dx0 + dx1 * dx1 + dx2 * dx2;
+                            if d2 <= cutoff2 + eps {
+                                js.push(j);
+                            }
+                        }
+                        j = next[ju];
+                    }
+                }
+            }
+        }
+
+        js.sort_unstable();
+        js.dedup();
+
+        for &j in &js {
+            let ju = j as usize;
+            let dvj = dv(i, ju);
+            if dvj > dv_max && dvj <= dv_max + 0.3 {
+                for k in (i + 1..ju).rev() {
+                    if dv(i, k) <= dv_max {
+                        extra.push(k as i64);
+                        break;
+                    }
+                }
+            }
+        }
+        js.extend(extra.iter().copied());
+
+        for j in (i + 1..=n).rev() {
+            if dv(i, j) <= dv_max {
+                js.push(j as i64);
+                break;
+            }
+        }
+        js.sort_unstable();
+        js.dedup();
+        for &j in &js {
+            pairs.push(i as c_long);
+            pairs.push(j as c_long);
+        }
+    }
+
+    let pair_count = (pairs.len() / 2) as c_long;
+    if pair_count == 0 {
+        return std::ptr::null_mut();
+    }
+
+    let bytes = pairs.len() * std::mem::size_of::<c_long>();
+    let ptr = libc::malloc(bytes) as *mut c_long;
+    if ptr.is_null() {
+        return std::ptr::null_mut();
+    }
+    std::ptr::copy_nonoverlapping(pairs.as_ptr(), ptr, pairs.len());
+    *out_len_pairs = pair_count;
+    ptr
 }

@@ -8,9 +8,10 @@
 #include <sys/types.h>
 #include "nrutil.h"
 #include "rna.h"
+#include "rnaview_profile.h"
 #include "cifparse.c"
 long ARGC = 0, AUTH = 1, PDB = -1;                            /* include all Heta atoms */
-long PS = 1, VRML = 0, ANAL = 0, XML = 0, HETA = 1, VERB = 1; /*globle variables */
+long PS = 0, VRML = 0, ANAL = 0, XML = 0, HETA = 1, VERB = 1; /*globle variables */
 char FILEOUT[BUF512];
 char **ARGV;
 
@@ -64,6 +65,10 @@ int main(int argc, char *argv[])
         else if (!strcmp(argv[i], "-v"))
         {
             VRML = 1;
+        }
+        else if (!strcmp(argv[i], "-p"))
+        {
+            PS = 1;
         }
         else if (!strcmp(argv[i], "-a"))
         {
@@ -856,6 +861,8 @@ void rna(char *pdbfile, long *type_stat, long **pair_stat, long *bs_all, char *c
                ResName, ChainID, ResSeq, Miscs, xyz, num_modify, modify_idx,
                type_stat, pair_stat);
 
+    rnaview_profile_dump();
+
     base_all = base_all + nres; /* acculate all the bases */
     *bs_all = base_all;
 
@@ -899,6 +906,8 @@ void work_horse(char *pdbfile, FILE *fout, long num_residue, long num,
     double **orien, **org, **Nxyz, **o3_p, **bp_xyz, **base_xy;
     char **pair_type;
 
+    rnaview_profile_begin(pdbfile, num_residue);
+
     multi_pair = lmatrix(1, num_residue, 1, 20);   /* max 20-poles */
     multi_idx = lvector(1, num_residue);           /*max multipoles = num_residue */
     pair_type = cmatrix(1, num_residue * 2, 0, 3); /* max base pairs */
@@ -915,15 +924,29 @@ void work_horse(char *pdbfile, FILE *fout, long num_residue, long num,
       orien --> rotation matrix for each library base to match each residue.
       org --> the fitted sxyz origin for each library base.
     */
-    base_info(num_residue, bseq, seidx, RY, AtomName, ResName, ChainID,
-              ResSeq, Miscs, xyz, orien, org, Nxyz, o3_p, BPRS);
+    {
+        long long t0 = 0;
+        if (rnaview_profile_is_enabled())
+            t0 = rnaview_profile_now_ns();
+        base_info(num_residue, bseq, seidx, RY, AtomName, ResName, ChainID,
+                  ResSeq, Miscs, xyz, orien, org, Nxyz, o3_p, BPRS);
+        if (rnaview_profile_is_enabled())
+            RNAVIEW_PROFILE.base_info_ns += rnaview_profile_now_ns() - t0;
+    }
 
     /* find all the base-pairs */
     printf("Finding all the base pairs...\n");
-    all_pairs(pdbfile, fout, num_residue, RY, Nxyz, orien, org, BPRS,
-              seidx, xyz, AtomName, ResName, ChainID, ResSeq, Miscs, bseq,
-              &num_pair_tot, pair_type, bs_pairs_tot, &num_single_base,
-              single_base, &num_multi, multi_idx, multi_pair, sugar_syn);
+    {
+        long long t0 = 0;
+        if (rnaview_profile_is_enabled())
+            t0 = rnaview_profile_now_ns();
+        all_pairs(pdbfile, fout, num_residue, RY, Nxyz, orien, org, BPRS,
+                  seidx, xyz, AtomName, ResName, ChainID, ResSeq, Miscs, bseq,
+                  &num_pair_tot, pair_type, bs_pairs_tot, &num_single_base,
+                  single_base, &num_multi, multi_idx, multi_pair, sugar_syn);
+        if (rnaview_profile_is_enabled())
+            RNAVIEW_PROFILE.all_pairs_total_ns += rnaview_profile_now_ns() - t0;
+    }
     for (i = 1; i <= num_pair_tot; i++)
     {
         printf("pair-type %4ld %4ld %4ld %s\n", i, bs_pairs_tot[i][1], bs_pairs_tot[i][2],
@@ -971,8 +994,14 @@ void work_horse(char *pdbfile, FILE *fout, long num_residue, long num,
      *             col#  1  2    3   4  5     6     7     8    9-11    12-14   15-17
      * i.e., add one more column for i from pair_stat [best_pair]
      */
+#ifdef RNAVIEW_RUST_CANDIDATE_PAIRS
+    rnaview_bestpair_candidates_build(num_residue, org, orien, BPRS[2], BPRS[3]);
+#endif
     for (i = 1; i <= num_residue; i++)
     {
+        long long t_best0 = 0;
+        if (rnaview_profile_is_enabled())
+            t_best0 = rnaview_profile_now_ns();
         best_pair(i, num_residue, RY, seidx, xyz, Nxyz, matched_idx, orien,
                   org, AtomName, bseq, BPRS, pair_istat);
         if (pair_istat[1])
@@ -989,7 +1018,12 @@ void work_horse(char *pdbfile, FILE *fout, long num_residue, long num,
                     base_pairs[num_bp][j + 1] = pair_istat[j];
             }
         }
+        if (rnaview_profile_is_enabled())
+            RNAVIEW_PROFILE.best_pair_total_ns += rnaview_profile_now_ns() - t_best0;
     }
+#ifdef RNAVIEW_RUST_CANDIDATE_PAIRS
+    rnaview_bestpair_candidates_clear();
+#endif
 
     bp_idx = lvector(1, num_bp);
     helix_marker = lvector(1, num_bp);

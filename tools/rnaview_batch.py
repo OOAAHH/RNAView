@@ -175,10 +175,16 @@ class JobResult:
 
 
 @dataclass(frozen=True)
+class GoldenEntry:
+    out_path: Path
+    core_path: Path
+
+
+@dataclass(frozen=True)
 class RegressIndex:
-    by_exact_input: dict[Path, Path]
-    by_dir_canon: dict[tuple[Path, str], Path]
-    by_dir_single: dict[Path, Path]
+    by_exact_input: dict[Path, GoldenEntry]
+    by_dir_canon: dict[tuple[Path, str], GoldenEntry]
+    by_dir_single: dict[Path, GoldenEntry]
 
 
 def _maybe_copy(src: Path, dst: Path) -> None:
@@ -197,7 +203,7 @@ def _canon_stem(text: str) -> str:
     return "".join(ch.lower() for ch in text if ch.isalnum())
 
 
-def _lookup_golden_core(input_path: Path, idx: RegressIndex) -> Path | None:
+def _lookup_golden_entry(input_path: Path, idx: RegressIndex) -> GoldenEntry | None:
     direct = idx.by_exact_input.get(input_path)
     if direct is not None:
         return direct
@@ -209,6 +215,24 @@ def _lookup_golden_core(input_path: Path, idx: RegressIndex) -> Path | None:
         return by_canon
 
     return idx.by_dir_single.get(directory)
+
+
+def _unified_diff(a: str, b: str, *, fromfile: str, tofile: str, max_lines: int) -> list[str]:
+    import difflib
+
+    diff = difflib.unified_diff(
+        a.splitlines(),
+        b.splitlines(),
+        fromfile=fromfile,
+        tofile=tofile,
+        lineterm="",
+    )
+    out: list[str] = []
+    for line in diff:
+        out.append(line)
+        if len(out) >= max_lines:
+            break
+    return out
 
 
 def _sysroot_env() -> dict[str, str]:
@@ -303,6 +327,7 @@ def _run_one_legacy(
     out_core_mod: Any,
     pairs_mod: Any,
     regress_index: RegressIndex | None,
+    regress_mode: str,
     max_diffs: int,
     keep_going: bool,
 ) -> JobResult:
@@ -339,8 +364,20 @@ def _run_one_legacy(
 
     fmt = _infer_format(input_path)
     flags = _legacy_cli_flags(fmt, ps)
-    inp_name = input_path.name
-    local_input = job_dir / inp_name
+
+    input_arg: str
+    local_input: Path
+    try:
+        rel = input_path.resolve().relative_to(repo.resolve())
+    except ValueError:
+        rel = None
+
+    if rel is not None:
+        input_arg = rel.as_posix()
+        local_input = job_dir / rel
+    else:
+        input_arg = input_path.name
+        local_input = job_dir / input_arg
     try:
         _maybe_copy(input_path, local_input)
     except Exception as e:  # noqa: BLE001
@@ -359,7 +396,7 @@ def _run_one_legacy(
     env["RNAVIEW"] = str(repo)
     env["PATH"] = f"{repo / 'bin'}:{env.get('PATH', '')}"
 
-    cmd = [str(rnaview_bin), *flags, inp_name]
+    cmd = [str(rnaview_bin), *flags, input_arg]
     try:
         with log_path.open("wb") as log:
             proc = subprocess.run(
@@ -381,9 +418,9 @@ def _run_one_legacy(
                 elapsed_ms=int((time.time() - started) * 1000),
             )
 
-        produced_out = job_dir / f"{inp_name}.out"
+        produced_out = job_dir / Path(f"{input_arg}.out")
         if not produced_out.exists():
-            candidates = sorted(job_dir.glob("*.out"))
+            candidates = sorted(job_dir.rglob("*.out"))
             if candidates:
                 produced_out = candidates[0]
             else:
@@ -411,11 +448,11 @@ def _run_one_legacy(
         regress_ok: bool | None = None
         regress_diffs: list[str] | None = None
         if regress_index is not None:
-            golden_core_path = _lookup_golden_core(input_path, regress_index)
-            if golden_core_path is None:
+            golden = _lookup_golden_entry(input_path, regress_index)
+            if golden is None:
                 regress_ok = None
-            else:
-                golden_core = json.loads(golden_core_path.read_text(encoding="utf-8"))
+            elif regress_mode == "core":
+                golden_core = json.loads(golden.core_path.read_text(encoding="utf-8"))
                 if core == golden_core:
                     regress_ok = True
                 else:
@@ -436,6 +473,36 @@ def _run_one_legacy(
                             regress_diffs=regress_diffs,
                             elapsed_ms=int((time.time() - started) * 1000),
                         )
+            elif regress_mode == "out":
+                golden_text = golden.out_path.read_text(encoding="utf-8", errors="replace")
+                candidate_text = legacy_out_path.read_text(encoding="utf-8", errors="replace")
+                if candidate_text == golden_text:
+                    regress_ok = True
+                else:
+                    regress_ok = False
+                    regress_diffs = _unified_diff(
+                        golden_text,
+                        candidate_text,
+                        fromfile=str(golden.out_path),
+                        tofile=str(legacy_out_path),
+                        max_lines=max_diffs,
+                    )
+                    if not keep_going:
+                        return JobResult(
+                            input=str(input_path),
+                            job_id=job_id,
+                            engine="legacy",
+                            status="failed",
+                            job_dir=str(job_dir),
+                            pairs_json=str(pairs_path),
+                            legacy_out=str(legacy_out_path),
+                            error=".out regression mismatch",
+                            regress_ok=False,
+                            regress_diffs=regress_diffs,
+                            elapsed_ms=int((time.time() - started) * 1000),
+                        )
+            else:
+                raise ValueError(f"unknown regress_mode: {regress_mode}")
 
         return JobResult(
             input=str(input_path),
@@ -472,6 +539,7 @@ def _run_one_rust(
     mmcif_parser: str,
     out_core_mod: Any,
     regress_index: RegressIndex | None,
+    regress_mode: str,
     max_diffs: int,
     keep_going: bool,
 ) -> JobResult:
@@ -562,11 +630,14 @@ def _run_one_rust(
         regress_ok: bool | None = None
         regress_diffs: list[str] | None = None
         if regress_index is not None:
-            golden_core_path = _lookup_golden_core(input_path, regress_index)
-            if golden_core_path is None:
+            if regress_mode != "core":
+                raise RuntimeError("--engine rust only supports --regress-mode core (for now)")
+
+            golden = _lookup_golden_entry(input_path, regress_index)
+            if golden is None:
                 regress_ok = None
             else:
-                golden_core = json.loads(golden_core_path.read_text(encoding="utf-8"))
+                golden_core = json.loads(golden.core_path.read_text(encoding="utf-8"))
                 if core == golden_core:
                     regress_ok = True
                 else:
@@ -613,21 +684,23 @@ def _run_one_rust(
 def _build_regress_index(manifest_path: Path) -> RegressIndex:
     repo = _repo_root()
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    by_exact_input: dict[Path, Path] = {}
-    by_dir: dict[Path, list[tuple[str, Path]]] = {}
+    by_exact_input: dict[Path, GoldenEntry] = {}
+    by_dir: dict[Path, list[tuple[str, GoldenEntry]]] = {}
     for entry in manifest.get("entries", []):
         out_rel = Path(entry["out"])
         input_rel = out_rel.with_suffix("")
         input_path = (repo / input_rel).resolve()
+        out_path = (repo / out_rel).resolve()
         core_path = (repo / entry["core_json"]).resolve()
-        by_exact_input[input_path] = core_path
+        golden = GoldenEntry(out_path=out_path, core_path=core_path)
+        by_exact_input[input_path] = golden
 
         directory = (repo / out_rel).resolve().parent
         canon = _canon_stem(input_rel.name)
-        by_dir.setdefault(directory, []).append((canon, core_path))
+        by_dir.setdefault(directory, []).append((canon, golden))
 
-    by_dir_canon: dict[tuple[Path, str], Path] = {}
-    by_dir_single: dict[Path, Path] = {}
+    by_dir_canon: dict[tuple[Path, str], GoldenEntry] = {}
+    by_dir_single: dict[Path, GoldenEntry] = {}
     for directory, entries in by_dir.items():
         if len(entries) == 1:
             by_dir_single[directory] = entries[0][1]
@@ -668,6 +741,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
             sys.stderr.write(f"missing manifest: {manifest}\n")
             return 2
         regress_index = _build_regress_index(manifest)
+        if str(getattr(args, "regress_mode", "core")) != "core" and engine == "rust":
+            sys.stderr.write("--engine rust only supports --regress-mode core (for now)\n")
+            return 2
 
     out_core_mod = _load_module("rnaview_out_core", repo / "tools" / "rnaview_out_core.py")
     pairs_mod = _load_module("rnaview_pairs_json", repo / "tools" / "rnaview_pairs_json.py")
@@ -697,6 +773,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
                     out_core_mod=out_core_mod,
                     pairs_mod=pairs_mod,
                     regress_index=regress_index,
+                    regress_mode=str(getattr(args, "regress_mode", "core")),
                     max_diffs=int(args.max_diffs),
                     keep_going=bool(args.keep_going),
                 )
@@ -716,6 +793,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
                     mmcif_parser=str(getattr(args, "mmcif_parser", "legacy")),
                     out_core_mod=out_core_mod,
                     regress_index=regress_index,
+                    regress_mode=str(getattr(args, "regress_mode", "core")),
                     max_diffs=int(args.max_diffs),
                     keep_going=bool(args.keep_going),
                 )
@@ -785,6 +863,12 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--ps", action="store_true", help="Enable legacy -p (produce PS/XML); legacy engine only")
     run.add_argument("--overwrite", action="store_true", help="Overwrite existing outputs")
     run.add_argument("--regress", action="store_true", help="Compare against frozen golden_core manifest")
+    run.add_argument(
+        "--regress-mode",
+        choices=["core", "out"],
+        default="core",
+        help="For --regress: compare extracted core JSON, or compare full .out text (legacy engine only)",
+    )
     run.add_argument("--manifest", default=None, help="Path to golden_core/manifest.json (default: test/golden_core/manifest.json)")
     run.add_argument("--max-diffs", type=int, default=50, help="Max diff lines to record on mismatch")
     run.add_argument("--keep-going", action="store_true", help="Keep running even if a mismatch is found")

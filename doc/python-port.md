@@ -40,7 +40,10 @@
 - `base_pair_statistics.out`：全局统计（`main()` 里总是写）。
 - 其他临时/辅助：`*_patt_tmp.out`、`*_tmp.pdb`、`best_pair.out`、`pattern_tmp.out` 等。
 
-历史上的 `test.sh` 以 `.ps` 做字节级 `diff`，容易被 `%%CreationDate` 等非确定字段干扰；在本仓库的迁移/回归阶段，推荐用 `.out` 的 core 语义回归（见 `tools/rnaview_out_core.py` / `tools/rnaview_batch.py --regress`）。
+历史上的 `test.sh` 以 `.ps` 做字节级 `diff`，容易被 `%%CreationDate` 等非确定字段干扰；在本仓库的迁移/回归阶段：
+
+- Phase 0/1：推荐用 `.out` 的 core 语义回归（`tools/rnaview_out_core.py` / `tools/rnaview_batch.py --regress --regress-mode core`）。
+- Phase 2：验收口径提升为 `FILEOUT.out` 逐字节一致（`tools/rnaview_batch.py --regress --regress-mode out`），用它作为 Rust 热点替换的硬门槛。
 
 ## 2. C 模块职责 → Rust/Python 组件映射
 
@@ -144,6 +147,8 @@
   4. `LW_pair_type()` 边类型与 cis/trans 对齐
   5. `all_pairs()` 枚举/去重/tertiary 标注对齐
 - Python 仍负责 I/O 编排与输出落盘；Rust 只负责热点计算。
+- Phase 2 的验收标准：对同一输入与同一组选项，`FILEOUT.out` 必须与 legacy 逐字节一致（可直接 `diff`）。
+  - 基准/剖析建议用 release 构建：`bash tools/build_rnaview_rustcore_release.sh`，并用 `python3 tools/rnaview_bench.py compare --rustcore-bin bin/rnaview_rustcore_release ...` 对比。
 
 ### Phase 3：I/O 现代化与可维护性（2–6 周）
 
@@ -155,7 +160,7 @@
 - 2D：优先输出 `SVG`（易集成网页/论文），其次 `PDF/PNG`；PS 作为兼容。
 - 3D：VRML 可保留，但更现代的是 `glTF` 或直接输出给 PyMOL/ChimeraX 脚本。
 
-## 5. 工作量粗估（以“core 有回归要求”为前提）
+## 5. 工作量粗估（以“core/.out 有回归要求”为前提）
 
 如果目标是“现代化 + 保持核心结果一致（base-pair/multiplets/stats 一致，PS/可视化后置）”：
 
@@ -174,7 +179,8 @@
 
 ## 6. 已确认约束 & 下一步
 
-- 权威输出：`pairs.json`（确定性序列化）+ `.out`（仅 core 段要求科学一致）；PS/可视化放到下一阶段。
+- Phase 0/1 权威输出：`pairs.json`（确定性序列化）+ `.out`（仅 core 段要求一致）；PS/可视化放到下一阶段。
+- Phase 2 验收口径：`FILEOUT.out` 逐字节一致（作为 Rust 核心替换的回归门槛）。
 - 技术分工：高性能热点用 Rust，其余编排/批处理/落盘用 Python。
 - 阶段目标：第一阶段以“批处理跑库”为主（大量结构、可并发、可重跑、可汇总）。
 

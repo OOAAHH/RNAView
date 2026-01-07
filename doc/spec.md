@@ -6,10 +6,11 @@
 
 ### 0.1 目标（已确认）
 
-- **科学一致性（强约束）**：升级前后 `.out` 的 core 内容一致：
+- **Phase 0/1（强约束）**：升级前后 `.out` 的 core 内容一致：
   - `BEGIN_base-pair … END_base-pair`
   - `BEGIN_multiplets … END_multiplets`
   - `The total base pairs = ... (from ... bases)` 及其后的统计表
+- **Phase 2（强约束）**：对同一输入与同一组选项，`FILEOUT.out` **逐字节一致**（可直接 `diff`）。
 - **批处理优先（第一阶段）**：支持“很多结构跑库”的高吞吐执行、可并发、可重跑、可汇总。
 - **技术分工**：对性能有要求的区域用 Rust；编排、批处理、落盘与生态集成用 Python。
 - **权威结构化输出**：`pairs.json`（确定性序列化，可字节级 diff）。
@@ -69,7 +70,7 @@ CLI/argv
                         └─ write_multiplets + 统计表输出
 ```
 
-> spec 视角关心的是：输出 `.out` 的 core 内容由哪些输入决定，以及哪些“环境/实现细节”不应纳入一致性口径。
+> spec 视角关心的是：哪些输入决定了 `.out` 的科学内容（core），以及在 Phase 2 里如何把 `.out` 的“格式/文本”也纳入逐字节一致的验收口径。
 
 ### 2.3 Legacy `.out` 的“core 契约”
 
@@ -198,15 +199,19 @@ Rust (Hot Core Engine)
 
 ### 3.3 输出契约（Output Contracts）
 
-#### 3.3.1 `.out`（只比较 core）
+#### 3.3.1 `.out`
 
 `.out` 在新系统中分两种来源：
-- A) legacy oracle 直接生成
-- B) 新实现由 `pairs.json`/内存结构重新渲染生成（推荐：保证确定性与一致性）
+- A) legacy / rustcore（复用 legacy C writer）直接生成
+- B) 未来纯 Rust 由内存结构重新渲染生成（需要复刻 legacy 的文本格式）
 
-**验收标准**：仅对比 core（base-pair/multiplets/stats），非 core 内容不纳入一致性。
+**验收标准分阶段**：
+- Phase 0/1：仅对比 core（base-pair/multiplets/stats），非 core 内容不纳入一致性。
+- Phase 2：`FILEOUT.out` 逐字节一致（可直接 `diff`）。
 
-对比工具：`tools/rnaview_out_core.py`（抽取 core → 规范化 JSON → compare）。
+对比工具：
+- core：`tools/rnaview_out_core.py`（抽取 core → 规范化 JSON → compare）
+- `.out` 全文：`tools/rnaview_batch.py --regress-mode out`（逐字节 diff）
 
 #### 3.3.2 `pairs.json`（权威）
 
@@ -245,7 +250,7 @@ Rust (Hot Core Engine)
   - `<out_dir>/<job_id>/legacy.out`（若 engine=legacy，便于审计）
   - `<out_dir>/summary.json`（成功/失败计数、错误列表、耗时）
 - 退出码：
-  - `0`：全部成功且通过 core 回归（若启用）
+  - `0`：全部成功且通过回归（`core`/`.out`，若启用）
   - `1`：存在失败或回归不一致
   - `2`：参数/输入错误
   - `3`：内部异常（bug）

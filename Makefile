@@ -22,14 +22,15 @@ LINCLUDES      =  -I$(INCL)
 RNAVIEW    = $(BIN)/rnaview
 
 SRCFILES = $(SRC)/rnaview.c \
-           $(SRC)/fpair.c  \
-           $(SRC)/fpair_sub.c  \
-           $(SRC)/pair_type.c  \
-           $(SRC)/nrutil.c  \
-           $(SRC)/ps-xy.c  \
-           $(SRC)/ps-xy-sub.c  \
-           $(SRC)/vrml.c  \
-           $(SRC)/rnaxml-new.c  \
+	           $(SRC)/fpair.c  \
+	           $(SRC)/fpair_sub.c  \
+	           $(SRC)/pair_type.c  \
+	           $(SRC)/rnaview_profile.c  \
+	           $(SRC)/nrutil.c  \
+	           $(SRC)/ps-xy.c  \
+	           $(SRC)/ps-xy-sub.c  \
+	           $(SRC)/vrml.c  \
+	           $(SRC)/rnaxml-new.c  \
            $(SRC)/analyze.c   \
            $(SRC)/pattern.c  \
            $(SRC)/xml2ps.c  \
@@ -42,14 +43,15 @@ HFILES = $(INCL)/rna.h $(INCL)/nrutil.h $(INCL)/rna_header.h \
 
 
 OBJ_FILE = $(OBJ)/rnaview.o \
-           $(OBJ)/fpair.o  \
-           $(OBJ)/fpair_sub.o  \
-           $(OBJ)/pair_type.o  \
-           $(OBJ)/nrutil.o  \
-           $(OBJ)/ps-xy.o  \
-           $(OBJ)/ps-xy-sub.o  \
-           $(OBJ)/vrml.o  \
-           $(OBJ)/rnaxml-new.o  \
+	           $(OBJ)/fpair.o  \
+	           $(OBJ)/fpair_sub.o  \
+	           $(OBJ)/pair_type.o  \
+	           $(OBJ)/rnaview_profile.o  \
+	           $(OBJ)/nrutil.o  \
+	           $(OBJ)/ps-xy.o  \
+	           $(OBJ)/ps-xy-sub.o  \
+	           $(OBJ)/vrml.o  \
+	           $(OBJ)/rnaxml-new.o  \
            $(OBJ)/analyze.o   \
            $(OBJ)/pattern.o  \
            $(OBJ)/xml2ps.o  \
@@ -76,6 +78,9 @@ $(OBJ)/fpair_sub.o : $(SRC)/fpair_sub.c
 
 $(OBJ)/pair_type.o : $(SRC)/pair_type.c 
 	$(CC) -g -Wall $(CFLAGS) -c $(SRC)/pair_type.c -o $@
+
+$(OBJ)/rnaview_profile.o : $(SRC)/rnaview_profile.c
+	$(CC) -g -Wall $(CFLAGS) -c $(SRC)/rnaview_profile.c -o $@
 
 $(OBJ)/nrutil.o : $(SRC)/nrutil.c 
 	$(CC) -g -Wall $(CFLAGS) -c  $(SRC)/nrutil.c -o $@
@@ -124,7 +129,6 @@ export:
 	@cd $(EXPORT_DIR); mkdir -p $(TEST)
 	@cp $(TESTFILES) $(EXPORT_DIR)/$(TEST)
 	@cp Makefile $(EXPORT_DIR)
-
 
 
 

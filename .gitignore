@@ -1,0 +1,11 @@
+.DS_Store
+
+*.pyc
+__pycache__/
+
+# Build outputs
+base_pair_statistics.out
+bin/rnaview*
+obj/*
+!obj/.placeholder
+rust/target/
