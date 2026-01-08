@@ -152,6 +152,8 @@ void all_pairs(char *pdbfile, FILE *fout, long num_residue, long *RY,
 	    long nh, m, stack_key = 0, c_key, bone_key;
 	    long **pair_info, *prot_rna, nh1 = 0, nh2 = 0, nnh = 0;
 	    double rtn_val[21], HB_UPPER[2], *hb_dist, change, geo_check;
+	    double last_angle = 0.0;
+	    int have_last_angle = 0;
 	    int prof = rnaview_profile_is_enabled();
 
     base_single = cmatrix(0, num_residue, 0, 120);
@@ -334,6 +336,11 @@ void all_pairs(char *pdbfile, FILE *fout, long num_residue, long *RY,
 	            {
 	                check_pairs(i, j, bseq, seidx, xyz, Nxyz, orien, org,
 	                            AtomName, BPRS, rtn_val, &bpid_lu, 0);
+	            }
+	            if (rtn_val[2] <= BPRS[3])
+	            {
+	                last_angle = rtn_val[3];
+	                have_last_angle = 1;
 	            }
             /* here at least one good NO H bond (donor and acceptor)*/
 
@@ -638,11 +645,16 @@ void all_pairs(char *pdbfile, FILE *fout, long num_residue, long *RY,
                     continue; /*dist between origins */
                 if (rtn_val[2] > BPRS[3] + 0.3)
                     continue; /* projection onto mean normal */
-                if (rtn_val[3] > BPRS[4])
-                    continue; /* angle between base normals */
-
-	                if (prof)
-	                {
+                {
+                    double angle = rtn_val[3];
+                    if (rtn_val[2] > BPRS[3] && have_last_angle)
+                        angle = last_angle;
+                    if (angle > BPRS[4])
+                        continue; /* angle between base normals */
+                }
+	
+		                if (prof)
+		                {
 	                    long long t0 = rnaview_profile_now_ns();
 	                    base_stack(i, j, bseq, seidx, AtomName, xyz, rtn_val, &stack_key);
 	                    RNAVIEW_PROFILE.all_pairs_base_stack_ns += rnaview_profile_now_ns() - t0;
@@ -1582,10 +1594,10 @@ void best_pair(long i, long num_residue, long *RY, long **seidx,
     {
         long start = 1;
         long end = num_residue + 1;
-        long use_adj = 0;
         long cand_idx;
 
 #ifdef RNAVIEW_RUST_CANDIDATE_PAIRS
+        long use_adj = 0;
         if (RNAVIEW_BESTPAIR_ADJ_OFF && RNAVIEW_BESTPAIR_ADJ && RNAVIEW_BESTPAIR_ADJ_N == num_residue)
         {
             start = RNAVIEW_BESTPAIR_ADJ_OFF[i];

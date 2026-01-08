@@ -119,8 +119,11 @@ unsafe fn mat_row<'a, T>(m: *mut *mut T, idx: c_long) -> *mut T {
     *m.offset(idx as isize)
 }
 
-unsafe fn cstr_eq(a: *const c_char, b: &[u8]) -> bool {
-    libc::strcmp(a, b.as_ptr() as *const c_char) == 0
+unsafe fn atom_eq4(a: *const c_char, pat: [u8; 4]) -> bool {
+    (*a.add(0) as u8) == pat[0]
+        && (*a.add(1) as u8) == pat[1]
+        && (*a.add(2) as u8) == pat[2]
+        && (*a.add(3) as u8) == pat[3]
 }
 
 #[no_mangle]
@@ -369,15 +372,24 @@ pub unsafe extern "C" fn Hbond_pair(
     c_key: c_long,
     bone_key: c_long,
 ) {
-    const O3P: &[u8] = b" O3'\0";
-    const O2P: &[u8] = b" O2P\0";
-    const O5P: &[u8] = b" O5'\0";
-    const O1P: &[u8] = b" O1P\0";
-    const O4P: &[u8] = b" O4'\0";
-    const C4: &[u8] = b" C4 \0";
-    const C5: &[u8] = b" C5 \0";
-    const C6: &[u8] = b" C6 \0";
-    const C2: &[u8] = b" C2 \0";
+    const O3P: [u8; 4] = *b" O3'";
+    const O2P: [u8; 4] = *b" O2P";
+    const O5P: [u8; 4] = *b" O5'";
+    const O1P: [u8; 4] = *b" O1P";
+    const O4P: [u8; 4] = *b" O4'";
+    const C4: [u8; 4] = *b" C4 ";
+    const C5: [u8; 4] = *b" C5 ";
+    const C6: [u8; 4] = *b" C6 ";
+    const C2: [u8; 4] = *b" C2 ";
+
+    #[derive(Clone, Copy)]
+    struct AtomInfo {
+        idx: c_long,
+        without_h: bool,
+        kind1: u8,
+        kind3: u8,
+        is_bone_o: bool,
+    }
 
     let seidx_i = mat_row(seidx, i);
     let seidx_j = mat_row(seidx, j);
@@ -393,39 +405,46 @@ pub unsafe extern "C" fn Hbond_pair(
     let mut with_h_n: c_long = 0;
     let prof = rnaview_profile_is_enabled() != 0;
 
+    let bi = to_ascii_upper(*bseq.add(i as usize));
+    let bj = to_ascii_upper(*bseq.add(j as usize));
+
+    let i_cap = (i_end - i_start + 1) as usize;
+    let j_cap = (j_end - j_start + 1) as usize;
+    let mut atoms_i: Vec<AtomInfo> = Vec::with_capacity(i_cap);
+    let mut atoms_j: Vec<AtomInfo> = Vec::with_capacity(j_cap);
+
     for m in i_start..=i_end {
         let atom_m = mat_row(AtomName, m);
+        let atom_m_1 = *atom_m.add(1);
 
-        if c_key == 0 && *atom_m.add(1) == b'C' as c_char {
+        if c_key == 0 && atom_m_1 == b'C' as c_char {
             continue;
         }
 
         if bone_key == 0
-            && (cstr_eq(atom_m, O3P) || cstr_eq(atom_m, O2P) || cstr_eq(atom_m, O5P) || cstr_eq(atom_m, O1P))
+            && (atom_eq4(atom_m, O3P) || atom_eq4(atom_m, O2P) || atom_eq4(atom_m, O5P) || atom_eq4(atom_m, O1P))
         {
             continue;
         }
 
-        if (*atom_m.add(1) == b'C' as c_char && *atom_m.add(3) == b'\'' as c_char) || *atom_m.add(1) == b'P' as c_char
-        {
+        if (atom_m_1 == b'C' as c_char && *atom_m.add(3) == b'\'' as c_char) || atom_m_1 == b'P' as c_char {
             continue;
         }
 
-        let bi = to_ascii_upper(*bseq.add(i as usize));
         if bi == b'A' as c_char || bi == b'I' as c_char {
-            if cstr_eq(atom_m, C4) || cstr_eq(atom_m, C5) || cstr_eq(atom_m, C6) {
+            if atom_eq4(atom_m, C4) || atom_eq4(atom_m, C5) || atom_eq4(atom_m, C6) {
                 continue;
             }
         } else if bi == b'G' as c_char {
-            if cstr_eq(atom_m, C4) || cstr_eq(atom_m, C5) || cstr_eq(atom_m, C6) || cstr_eq(atom_m, C2) {
+            if atom_eq4(atom_m, C4) || atom_eq4(atom_m, C5) || atom_eq4(atom_m, C6) || atom_eq4(atom_m, C2) {
                 continue;
             }
         } else if bi == b'P' as c_char {
-            if cstr_eq(atom_m, C4) || cstr_eq(atom_m, C5) {
+            if atom_eq4(atom_m, C4) || atom_eq4(atom_m, C5) {
                 continue;
             }
         } else if bi == b'U' as c_char || bi == b'C' as c_char || bi == b'T' as c_char {
-            if cstr_eq(atom_m, C4) || cstr_eq(atom_m, C2) {
+            if atom_eq4(atom_m, C4) || atom_eq4(atom_m, C2) {
                 continue;
             }
         }
@@ -438,104 +457,123 @@ pub unsafe extern "C" fn Hbond_pair(
             H_catalog(i, m, bseq, AtomName, &mut without_h_m, &mut with_h_m);
         }
 
-        for n in j_start..=j_end {
-            let atom_n = mat_row(AtomName, n);
+        atoms_i.push(AtomInfo {
+            idx: m,
+            without_h: without_h_m == 1,
+            kind1: atom_m_1 as u8,
+            kind3: (*atom_m.add(3) as u8),
+            is_bone_o: atom_eq4(atom_m, O3P)
+                || atom_eq4(atom_m, O4P)
+                || atom_eq4(atom_m, O5P)
+                || atom_eq4(atom_m, O1P)
+                || atom_eq4(atom_m, O2P),
+        });
+    }
 
-            if c_key == 0 && *atom_n.add(1) == b'C' as c_char {
+    for n in j_start..=j_end {
+        let atom_n = mat_row(AtomName, n);
+        let atom_n_1 = *atom_n.add(1);
+
+        if c_key == 0 && atom_n_1 == b'C' as c_char {
+            continue;
+        }
+
+        if bone_key == 0
+            && (atom_eq4(atom_n, O3P) || atom_eq4(atom_n, O2P) || atom_eq4(atom_n, O5P) || atom_eq4(atom_n, O1P))
+        {
+            continue;
+        }
+
+        if (atom_n_1 == b'C' as c_char && *atom_n.add(3) == b'\'' as c_char) || atom_n_1 == b'P' as c_char {
+            continue;
+        }
+
+        if bj == b'A' as c_char || bj == b'I' as c_char {
+            if atom_eq4(atom_n, C4) || atom_eq4(atom_n, C5) || atom_eq4(atom_n, C6) {
+                continue;
+            }
+        } else if bj == b'G' as c_char {
+            if atom_eq4(atom_n, C4) || atom_eq4(atom_n, C5) || atom_eq4(atom_n, C6) || atom_eq4(atom_n, C2) {
+                continue;
+            }
+        } else if bj == b'P' as c_char {
+            if atom_eq4(atom_n, C4) || atom_eq4(atom_n, C5) {
+                continue;
+            }
+        } else if bj == b'U' as c_char || bj == b'C' as c_char || bj == b'T' as c_char {
+            if atom_eq4(atom_n, C4) || atom_eq4(atom_n, C2) {
+                continue;
+            }
+        }
+
+        if prof {
+            let t0 = rnaview_profile_now_ns();
+            H_catalog(j, n, bseq, AtomName, &mut without_h_n, &mut with_h_n);
+            rnaview_profile_add_all_pairs_hbond_pair_h_catalog(rnaview_profile_now_ns() - t0);
+        } else {
+            H_catalog(j, n, bseq, AtomName, &mut without_h_n, &mut with_h_n);
+        }
+
+        atoms_j.push(AtomInfo {
+            idx: n,
+            without_h: without_h_n == 1,
+            kind1: atom_n_1 as u8,
+            kind3: (*atom_n.add(3) as u8),
+            is_bone_o: atom_eq4(atom_n, O3P)
+                || atom_eq4(atom_n, O4P)
+                || atom_eq4(atom_n, O5P)
+                || atom_eq4(atom_n, O1P)
+                || atom_eq4(atom_n, O2P),
+        });
+    }
+
+    for mi in atoms_i {
+        let atom_m = mat_row(AtomName, mi.idx);
+        let atom_m_1 = mi.kind1;
+        let atom_m_3 = mi.kind3;
+
+        for nj in &atoms_j {
+            if atom_m_1 == b'C' && nj.kind1 == b'C' {
                 continue;
             }
 
-            if bone_key == 0
-                && (cstr_eq(atom_n, O3P) || cstr_eq(atom_n, O2P) || cstr_eq(atom_n, O5P) || cstr_eq(atom_n, O1P))
-            {
+            if mi.is_bone_o && nj.is_bone_o {
                 continue;
             }
 
-            if (*atom_n.add(1) == b'C' as c_char && *atom_n.add(3) == b'\'' as c_char) || *atom_n.add(1) == b'P' as c_char
-            {
+            if mi.without_h && nj.without_h {
                 continue;
             }
 
-            let bj = to_ascii_upper(*bseq.add(j as usize));
-            if bj == b'A' as c_char || bj == b'I' as c_char {
-                if cstr_eq(atom_n, C4) || cstr_eq(atom_n, C5) || cstr_eq(atom_n, C6) {
-                    continue;
-                }
-            } else if bj == b'G' as c_char {
-                if cstr_eq(atom_n, C4) || cstr_eq(atom_n, C5) || cstr_eq(atom_n, C6) || cstr_eq(atom_n, C2) {
-                    continue;
-                }
-            } else if bj == b'P' as c_char {
-                if cstr_eq(atom_n, C4) || cstr_eq(atom_n, C5) {
-                    continue;
-                }
-            } else if bj == b'U' as c_char || bj == b'C' as c_char || bj == b'T' as c_char {
-                if cstr_eq(atom_n, C4) || cstr_eq(atom_n, C2) {
-                    continue;
-                }
-            }
+            let atom_n = mat_row(AtomName, nj.idx);
+            let atom_n_1 = nj.kind1;
+            let atom_n_3 = nj.kind3;
 
-            if *atom_m.add(1) == b'C' as c_char && *atom_n.add(1) == b'C' as c_char {
-                continue;
-            }
+            let m_base_no = is_in(b"NO", atom_m_1 as c_char) && atom_m_3 != b'\'' && atom_m_3 != b'P';
+            let n_base_no = is_in(b"NO", atom_n_1 as c_char) && atom_n_3 != b'\'' && atom_n_3 != b'P';
 
-            if (cstr_eq(atom_m, O3P) || cstr_eq(atom_m, O4P) || cstr_eq(atom_m, O5P) || cstr_eq(atom_m, O1P) || cstr_eq(atom_m, O2P))
-                && (cstr_eq(atom_n, O3P) || cstr_eq(atom_n, O4P) || cstr_eq(atom_n, O5P) || cstr_eq(atom_n, O1P) || cstr_eq(atom_n, O2P))
-            {
-                continue;
-            }
-
-            if prof {
-                let t0 = rnaview_profile_now_ns();
-                H_catalog(j, n, bseq, AtomName, &mut without_h_n, &mut with_h_n);
-                rnaview_profile_add_all_pairs_hbond_pair_h_catalog(rnaview_profile_now_ns() - t0);
-            } else {
-                H_catalog(j, n, bseq, AtomName, &mut without_h_n, &mut with_h_n);
-            }
-            if without_h_m == 1 && without_h_n == 1 {
-                continue;
-            }
-
-            let dist = if is_in(b"NO", *atom_m.add(1)) && *atom_m.add(3) != b'\'' as c_char && *atom_m.add(3) != b'P' as c_char
-                && is_in(b"NO", *atom_n.add(1)) && *atom_n.add(3) != b'\'' as c_char && *atom_n.add(3) != b'P' as c_char
+            let dist = if m_base_no && n_base_no
             {
                 let mut d = 3.4 + change;
                 if d >= 4.0 {
                     d = 4.0;
                 }
                 d
-            } else if (*atom_m.add(1) == b'C' as c_char
-                && *atom_n.add(3) != b'\'' as c_char
-                && *atom_n.add(3) != b'P' as c_char
-                && is_in(b"NO", *atom_n.add(1)))
-                || (*atom_n.add(1) == b'C' as c_char
-                    && *atom_m.add(3) != b'\'' as c_char
-                    && *atom_m.add(3) != b'P' as c_char
-                    && is_in(b"NO", *atom_m.add(1)))
+            } else if (atom_m_1 == b'C' && n_base_no) || (atom_n_1 == b'C' && m_base_no)
             {
                 let mut d = 3.6 + change;
                 if d >= 4.0 {
                     d = 4.0;
                 }
                 d
-            } else if (*atom_m.add(1) == b'O' as c_char
-                && *atom_m.add(3) == b'\'' as c_char
-                && is_in(b"NO", *atom_n.add(1))
-                && *atom_n.add(3) != b'\'' as c_char
-                && *atom_n.add(3) != b'P' as c_char)
-                || (*atom_n.add(1) == b'O' as c_char
-                    && *atom_n.add(3) == b'\'' as c_char
-                    && is_in(b"NO", *atom_m.add(1))
-                    && *atom_m.add(3) != b'\'' as c_char
-                    && *atom_m.add(3) != b'P' as c_char)
+            } else if (atom_m_1 == b'O' && atom_m_3 == b'\'' && n_base_no) || (atom_n_1 == b'O' && atom_n_3 == b'\'' && m_base_no)
             {
                 let mut d = 3.4 + change;
                 if d >= 4.0 {
                     d = 4.0;
                 }
                 d
-            } else if (*atom_m.add(3) == b'P' as c_char && *atom_n.add(3) != b'\'' as c_char && *atom_n.add(1) != b'C' as c_char)
-                || (*atom_n.add(3) == b'P' as c_char && *atom_m.add(3) != b'\'' as c_char && *atom_m.add(1) != b'C' as c_char)
+            } else if (atom_m_3 == b'P' && atom_n_3 != b'\'' && atom_n_1 != b'C') || (atom_n_3 == b'P' && atom_m_3 != b'\'' && atom_m_1 != b'C')
             {
                 let mut d = 3.2 + change;
                 if d >= 4.0 {
@@ -550,8 +588,8 @@ pub unsafe extern "C" fn Hbond_pair(
                 d
             };
 
-            let xyz_m = mat_row(xyz, m);
-            let xyz_n = mat_row(xyz, n);
+            let xyz_m = mat_row(xyz, mi.idx);
+            let xyz_n = mat_row(xyz, nj.idx);
             let mut dtmp: [c_double; 4] = [0.0; 4];
             for k in 1..=3 {
                 dtmp[k] = *xyz_m.add(k as usize) - *xyz_n.add(k as usize);
