@@ -7,6 +7,16 @@ For Phase 0 / Phase 1 it focuses on **I/O contracts**:
 - Emit `pairs.json` (schema v1) from a legacy RNAVIEW `.out` file (core sections only).
 - Render a minimal RNAVIEW `.out` containing only the core sections from `pairs.json` (`pairs.json -> .out(core)` as a pure function).
 
+## Phase 2 "No-C" target
+
+The Phase 2 end-goal is **byte-exact legacy `.out` compatibility without any C/legacy runtime dependency**
+(pure Rust core + Python orchestration).
+
+That means:
+
+- `from-structure` must not shell out to the legacy `bin/rnaview` (legacy is allowed only as a test oracle).
+- Writing `FILEOUT.out` must not rely on the legacy C writer (a No-C `.out(full)` writer is required).
+
 ## Build
 
 ```bash
@@ -22,7 +32,7 @@ bash tools/cargo_sysroot.sh test --manifest-path rust/Cargo.toml
 
 ## Usage
 
-### `PDB/mmCIF -> pairs.json` (Phase2 bootstrap)
+### `PDB/mmCIF -> pairs.json` (Phase2 bootstrap; uses legacy oracle)
 
 This currently shells out to the legacy `bin/rnaview` as an oracle, then parses the generated `.out` into `pairs.json`.
 

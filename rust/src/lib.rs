@@ -4,9 +4,11 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 mod structure;
+mod out_full;
 #[cfg(feature = "legacy-ffi")]
 mod legacy_ffi;
 pub use structure::{parse_structure_bases, BaseResidue};
+pub use out_full::{parse_out_full, write_out_full, OutEol, OutFull, OutBasePairLine, OutPairKind};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Source {

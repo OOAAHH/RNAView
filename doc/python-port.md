@@ -138,7 +138,14 @@
 
 优点：风险最低、很快可交付；可以并行推进 Phase 2/3。
 
-### Phase 2：Rust 核心引擎逐块替换（2–8 周）
+### Phase 2：Rust 核心引擎替换（No-C + `.out` byte-exact）（4–12 周）
+
+Phase 2 有两道门槛（建议都写进里程碑）：
+
+- **Gate A（桥接，可选）**：复用 legacy C pipeline/writer，仅把热点替换为 Rust（快速做到 `.out` 字节级一致，并用于性能剖析/定位）。
+- **Gate B（No-C，最终验收）**：交付“纯 Rust core + Python 编排”的可发行形态：运行时与构建不依赖任何 C（也不 shell out `bin/rnaview`），但仍保持 `.out` 字节级兼容。
+
+#### Gate A：C pipeline + Rust hot functions（桥接，可选）
 
 - Rust 侧按可回归拆分实现并替换（每一步都用 Phase 1 的 oracle 对照）：
   1. residue/base 识别与编号（对齐 `.out` 的 base index 语义）
@@ -146,14 +153,26 @@
   3. `Hbond_pair()` 氢键枚举与阈值对齐
   4. `LW_pair_type()` 边类型与 cis/trans 对齐
   5. `all_pairs()` 枚举/去重/tertiary 标注对齐
-- Python 仍负责 I/O 编排与输出落盘；Rust 只负责热点计算。
-- Phase 2 的验收标准：对同一输入与同一组选项，`FILEOUT.out` 必须与 legacy 逐字节一致（可直接 `diff`）。
+- 验收：对同一输入与同一组选项，`FILEOUT.out` 必须与 golden/legacy **逐字节一致**（可直接 `diff`）。
   - 基准/剖析建议用 release 构建：`bash tools/build_rnaview_rustcore_release.sh`，并用 `python3 tools/rnaview_bench.py compare --rustcore-bin bin/rnaview_rustcore_release ...` 对比。
 
-### Phase 3：I/O 现代化与可维护性（2–6 周）
+#### Gate B：纯 Rust core + Python 编排（No-C，Phase 2 最终验收）
 
-- 视需求把 PDB/mmCIF 解析迁移到 Python 或 Rust（以“不破坏 core 一致性”为前提）。
-- 引入更清晰的数据模型与错误处理（便于跑库与定位问题）。
+- Rust 实现“结构解析 + core 计算 + `.out` writer”完整闭环，不再依赖 legacy/C：
+  - 结构解析：PDB/mmCIF（含 `auth/label`、NMR 选模、altloc、insertion code 等语义）在 Rust/Python 中实现，但不调用 legacy。
+  - core 计算：候选对筛选/几何/Hbond/LW 分类/multiplets/stats 全部在 Rust 中完成。
+  - 输出：生成 `FILEOUT.out`（byte-exact）并同时输出 `pairs.json`（确定性序列化）用于结构化消费/缓存。
+- Python 仍负责编排：批处理、并发、目录布局、回归报告、失败隔离。
+- 验收（No-C + byte-exact）：
+  - 构建：仅依赖 `cargo build --release` + Python 运行环境（不编译/链接任何 C；不需要 `make/cc/gcc`）。
+  - 运行：批处理/单文件运行不调用 `bin/rnaview`/`bin/rnaview_rustcore`（legacy 只允许作为测试 oracle）。
+  - 输出：回归集 `.out` 逐字节一致（同 Gate A），并且 `pairs.json` 与 golden core 等价。
+
+### Phase 3：工程化与性能（2–6 周）
+
+- CI/可重复构建：把回归（core + `.out`）与基准跑进 CI；提供“一键跑套件 + 产出报告”的脚本。
+- API/CLI 稳定化：错误码、日志、schema 版本策略；为跑库提供更清晰的失败定位信息。
+- 性能优化：在不改变结果的前提下做空间筛选与并行（并用基准锁住收益）。
 
 ### Phase 4：渲染与格式现代化（2–6 周）
 
@@ -165,22 +184,24 @@
 如果目标是“现代化 + 保持核心结果一致（base-pair/multiplets/stats 一致，PS/可视化后置）”：
 
 - Phase 1：1–2 周
-- Phase 2：2–8 周
+- Phase 2：4–12 周（含 No-C）
 - Phase 3：2–6 周
 - Phase 4：2–6 周
 
-合计：大约 2–5 个月（取决于一致性要求、性能目标、以及是否引入 numpy/scipy/gemmi 等依赖）。
+合计：大约 2–7 个月（取决于一致性要求、No-C 范围、性能目标、以及是否引入 numpy/scipy/gemmi 等依赖）。
 
 风险点：
 
 - **一致性**：阈值、边界条件、altloc/NMR 模型选择、modified residues 的处理会导致输出差异。
+- **`.out` 字节级兼容**：writer 的空格/换行/排序/隐藏分支非常多，任何“看似不重要”的文本变化都会导致 diff。
+- **No-C**：legacy 的隐式行为（解析/过滤/编号）需要被 Rust/Python 完整复刻，短期会显著增加 Phase 2 的工作量。
 - **性能**：大 RNA（上千残基）若不做邻域筛选，Python 会明显慢于 C。
 - **渲染**：PS 逐字节一致很难；建议把“科学内容一致”与“像素/文本完全一致”分开定义。
 
 ## 6. 已确认约束 & 下一步
 
 - Phase 0/1 权威输出：`pairs.json`（确定性序列化）+ `.out`（仅 core 段要求一致）；PS/可视化放到下一阶段。
-- Phase 2 验收口径：`FILEOUT.out` 逐字节一致（作为 Rust 核心替换的回归门槛）。
+- Phase 2 验收口径：`FILEOUT.out` 逐字节一致 **且** 默认执行路径 No-C（纯 Rust core + Python 编排）。
 - 技术分工：高性能热点用 Rust，其余编排/批处理/落盘用 Python。
 - 阶段目标：第一阶段以“批处理跑库”为主（大量结构、可并发、可重跑、可汇总）。
 
@@ -188,4 +209,5 @@
 
 1. 先把 `test/**.out` 作为 golden，写一个“抽取 `.out` core 段并做语义对比”的回归脚本（`tools/rnaview_out_core.py`）。
 2. 交付 Python 批处理 CLI：并行跑 `bin/rnaview`，生成 `pairs.json`，并用上面的脚本对照 golden。
-3. 再开始 Rust 核心引擎替换：每替换一块，就把回归集跑通并对齐 core 结果。
+3. Phase 2 Gate A：继续用 `.out` 字节级回归锁住热点替换的正确性，并用 profile/bench 找到真实热点。
+4. Phase 2 Gate B：定义 “No-C + `.out` byte-exact” 的验收脚本与交付物（纯 Rust core + `.out` writer），逐步替换掉 legacy oracle 与 C pipeline。

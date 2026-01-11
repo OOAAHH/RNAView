@@ -10,7 +10,9 @@
   - `BEGIN_base-pair … END_base-pair`
   - `BEGIN_multiplets … END_multiplets`
   - `The total base pairs = ... (from ... bases)` 及其后的统计表
-- **Phase 2（强约束）**：对同一输入与同一组选项，`FILEOUT.out` **逐字节一致**（可直接 `diff`）。
+- **Phase 2（强约束）**：
+  - 对同一输入与同一组选项，`FILEOUT.out` **逐字节一致**（可直接 `diff`）。
+  - **No-C**：最终交付路径不依赖 C（不编译/链接 C，也不 shell out legacy 二进制）；legacy 仅允许作为测试/回归 oracle。
 - **批处理优先（第一阶段）**：支持“很多结构跑库”的高吞吐执行、可并发、可重跑、可汇总。
 - **技术分工**：对性能有要求的区域用 Rust；编排、批处理、落盘与生态集成用 Python。
 - **权威结构化输出**：`pairs.json`（确定性序列化，可字节级 diff）。
@@ -143,7 +145,7 @@ Spec 一致性口径（core）：
 ```
 Python (Orchestration)
   - CLI / 批处理调度 / 并发 / 重跑 / 日志 / 目录布局
-  - I/O glue：调用 legacy oracle 或 Rust engine
+  - I/O glue：调用 Rust engine（legacy oracle 仅用于测试/回归对照）
   - 产物落盘：pairs.json + (可选) .out writer
   - 回归验证：对照 golden 的 core 等价性
 
@@ -156,9 +158,10 @@ Rust (Hot Core Engine)
   - （可选）multiplets 推导与统计
 ```
 
-第一阶段推荐形态：
-- Python 默认仍可调用 `bin/rnaview` 作为 oracle，确保回归对齐；
-- Rust engine 逐块替换热点逻辑，替换一块就跑回归集。
+迁移阶段推荐形态（按 gate）：
+- Phase 0/1：允许 Python 调 `bin/rnaview` 做 oracle，确保回归对齐；
+- Phase 2 Gate A：允许复用 legacy C writer（`legacy/rustcore`）做 `.out` byte-exact 的桥接；
+- Phase 2 Gate B（No-C）：默认执行路径不再调用 legacy/C。
 
 ### 3.2 统一的 Domain Model（语言无关）
 
@@ -201,13 +204,14 @@ Rust (Hot Core Engine)
 
 #### 3.3.1 `.out`
 
-`.out` 在新系统中分两种来源：
-- A) legacy / rustcore（复用 legacy C writer）直接生成
-- B) 未来纯 Rust 由内存结构重新渲染生成（需要复刻 legacy 的文本格式）
+`.out` 在新系统中分两类实现路径：
+- A) legacy / rustcore（复用 legacy C writer）生成：仅作为桥接/对照工具，不满足 Phase 2（No-C）最终验收。
+- B) No-C writer（Rust/Python）生成：需要复刻 legacy 的 `.out` 全文格式，用于 Phase 2（No-C）最终验收。
 
 **验收标准分阶段**：
 - Phase 0/1：仅对比 core（base-pair/multiplets/stats），非 core 内容不纳入一致性。
-- Phase 2：`FILEOUT.out` 逐字节一致（可直接 `diff`）。
+- Phase 2 Gate A：`FILEOUT.out` 逐字节一致（可直接 `diff`；允许 A 路径桥接）。
+- Phase 2 Gate B（No-C）：`FILEOUT.out` 逐字节一致 **且** 默认执行路径 No-C（B 路径）。
 
 对比工具：
 - core：`tools/rnaview_out_core.py`（抽取 core → 规范化 JSON → compare）
@@ -273,8 +277,10 @@ Rust (Hot Core Engine)
 1. 以 `test/**.out` 为 golden，先用 `tools/rnaview_out_core.py extract` 固化 core 期望。
    - 批量生成：`python3 tools/rnaview_out_core.py freeze test`（输出到 `test/golden_core/`，含 `manifest.json`）
 2. 新实现每个阶段只要能产出 `.out` 或 `pairs.json`，都必须能投影成同一份 core，并通过 compare。
-3. 当 Rust engine 能直接产出 `pairs.json` 时，把 `.out` writer 作为纯函数（`pairs.json -> .out core`），从根上减少不确定性。
-   - writer/验证工具：`python3 tools/rnaview_pairs_json.py validate-golden`
+3. 当 Rust engine 能直接产出 `pairs.json` 时：
+   - 继续保留 `pairs.json -> .out(core)` 作为低风险的纯函数回归工具（用于核心语义验证与最小化 diff）。
+   - 若 Phase 2 要求 `.out` **byte-exact** 且 **No-C**，则必须进一步实现 `.out(full)` writer，并把非 core 字段也纳入可验证的数据模型（必要时扩展 `pairs.json`/另加 AST），避免隐藏依赖与非确定性。
+   - 现有 core writer/验证工具：`python3 tools/rnaview_pairs_json.py validate-golden`
 
 ---
 
