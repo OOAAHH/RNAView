@@ -168,6 +168,7 @@ class JobResult:
     job_dir: str
     pairs_json: str | None = None
     legacy_out: str | None = None
+    out_path: str | None = None
     error: str | None = None
     regress_ok: bool | None = None
     regress_diffs: list[str] | None = None
@@ -233,6 +234,10 @@ def _unified_diff(a: str, b: str, *, fromfile: str, tofile: str, max_lines: int)
         if len(out) >= max_lines:
             break
     return out
+
+
+def _maybe_eol_only_diff(a: bytes, b: bytes) -> bool:
+    return a.replace(b"\r\n", b"\n") == b.replace(b"\r\n", b"\n")
 
 
 def _sysroot_env() -> dict[str, str]:
@@ -348,6 +353,7 @@ def _run_one_legacy(
             job_dir=str(job_dir),
             pairs_json=str(pairs_path),
             legacy_out=str(legacy_out_path),
+            out_path=str(legacy_out_path),
         )
 
     started = time.time()
@@ -468,25 +474,31 @@ def _run_one_legacy(
                             job_dir=str(job_dir),
                             pairs_json=str(pairs_path),
                             legacy_out=str(legacy_out_path),
+                            out_path=str(legacy_out_path),
                             error="core regression mismatch",
                             regress_ok=False,
                             regress_diffs=regress_diffs,
                             elapsed_ms=int((time.time() - started) * 1000),
                         )
             elif regress_mode == "out":
-                golden_text = golden.out_path.read_text(encoding="utf-8", errors="replace")
-                candidate_text = legacy_out_path.read_text(encoding="utf-8", errors="replace")
-                if candidate_text == golden_text:
+                golden_bytes = golden.out_path.read_bytes()
+                candidate_bytes = legacy_out_path.read_bytes()
+                if candidate_bytes == golden_bytes:
                     regress_ok = True
                 else:
                     regress_ok = False
-                    regress_diffs = _unified_diff(
-                        golden_text,
-                        candidate_text,
-                        fromfile=str(golden.out_path),
-                        tofile=str(legacy_out_path),
-                        max_lines=max_diffs,
-                    )
+                    if _maybe_eol_only_diff(golden_bytes, candidate_bytes):
+                        regress_diffs = ["byte mismatch: line endings differ (CRLF vs LF)"]
+                    else:
+                        golden_text = golden_bytes.decode("utf-8", errors="replace")
+                        candidate_text = candidate_bytes.decode("utf-8", errors="replace")
+                        regress_diffs = _unified_diff(
+                            golden_text,
+                            candidate_text,
+                            fromfile=str(golden.out_path),
+                            tofile=str(legacy_out_path),
+                            max_lines=max_diffs,
+                        )
                     if not keep_going:
                         return JobResult(
                             input=str(input_path),
@@ -496,6 +508,7 @@ def _run_one_legacy(
                             job_dir=str(job_dir),
                             pairs_json=str(pairs_path),
                             legacy_out=str(legacy_out_path),
+                            out_path=str(legacy_out_path),
                             error=".out regression mismatch",
                             regress_ok=False,
                             regress_diffs=regress_diffs,
@@ -512,6 +525,7 @@ def _run_one_legacy(
             job_dir=str(job_dir),
             pairs_json=str(pairs_path),
             legacy_out=str(legacy_out_path),
+            out_path=str(legacy_out_path),
             regress_ok=regress_ok,
             regress_diffs=regress_diffs,
             elapsed_ms=int((time.time() - started) * 1000),
@@ -535,8 +549,9 @@ def _run_one_rust(
     job_id_mode: str,
     overwrite: bool,
     rust_bin: Path,
-    legacy_bin: Path,
     mmcif_parser: str,
+    rust_oracle: str,
+    legacy_bin: Path | None,
     out_core_mod: Any,
     regress_index: RegressIndex | None,
     regress_mode: str,
@@ -549,7 +564,8 @@ def _run_one_rust(
     job_dir.mkdir(parents=True, exist_ok=True)
 
     pairs_path = job_dir / "pairs.json"
-    if not overwrite and pairs_path.exists():
+    engine_out_path = job_dir / "engine.out"
+    if not overwrite and pairs_path.exists() and engine_out_path.exists():
         return JobResult(
             input=str(input_path),
             job_id=job_id,
@@ -557,6 +573,7 @@ def _run_one_rust(
             status="skipped",
             job_dir=str(job_dir),
             pairs_json=str(pairs_path),
+            out_path=str(engine_out_path),
         )
 
     started = time.time()
@@ -583,15 +600,27 @@ def _run_one_rust(
         str(input_path),
         "--format",
         fmt,
+        "--oracle",
+        str(rust_oracle),
         "--mmcif-parser",
         str(mmcif_parser),
-        "--legacy-bin",
-        str(legacy_bin),
-        "--rnaview-root",
-        str(repo),
         "-o",
         str(pairs_path),
+        "--emit-out",
+        str(engine_out_path),
     ]
+    if rust_oracle == "legacy":
+        if legacy_bin is None:
+            return JobResult(
+                input=str(input_path),
+                job_id=job_id,
+                engine="rust",
+                status="failed",
+                job_dir=str(job_dir),
+                error="rust oracle is legacy but no legacy_bin was provided",
+                elapsed_ms=int((time.time() - started) * 1000),
+            )
+        cmd.extend(["--legacy-bin", str(legacy_bin), "--rnaview-root", str(repo)])
 
     try:
         with log_path.open("wb") as log:
@@ -623,6 +652,17 @@ def _run_one_rust(
                 error=f"rust engine produced no pairs.json; see {log_path}",
                 elapsed_ms=int((time.time() - started) * 1000),
             )
+        if not engine_out_path.exists():
+            return JobResult(
+                input=str(input_path),
+                job_id=job_id,
+                engine="rust",
+                status="failed",
+                job_dir=str(job_dir),
+                pairs_json=str(pairs_path),
+                error=f"rust engine produced no .out; see {log_path}",
+                elapsed_ms=int((time.time() - started) * 1000),
+            )
 
         pairs = json.loads(pairs_path.read_text(encoding="utf-8"))
         core = pairs.get("core", {})
@@ -630,13 +670,10 @@ def _run_one_rust(
         regress_ok: bool | None = None
         regress_diffs: list[str] | None = None
         if regress_index is not None:
-            if regress_mode != "core":
-                raise RuntimeError("--engine rust only supports --regress-mode core (for now)")
-
             golden = _lookup_golden_entry(input_path, regress_index)
             if golden is None:
                 regress_ok = None
-            else:
+            elif regress_mode == "core":
                 golden_core = json.loads(golden.core_path.read_text(encoding="utf-8"))
                 if core == golden_core:
                     regress_ok = True
@@ -652,11 +689,47 @@ def _run_one_rust(
                             status="failed",
                             job_dir=str(job_dir),
                             pairs_json=str(pairs_path),
+                            out_path=str(engine_out_path),
                             error="core regression mismatch",
                             regress_ok=False,
                             regress_diffs=regress_diffs,
                             elapsed_ms=int((time.time() - started) * 1000),
                         )
+            elif regress_mode == "out":
+                golden_bytes = golden.out_path.read_bytes()
+                candidate_bytes = engine_out_path.read_bytes()
+                if candidate_bytes == golden_bytes:
+                    regress_ok = True
+                else:
+                    regress_ok = False
+                    if _maybe_eol_only_diff(golden_bytes, candidate_bytes):
+                        regress_diffs = ["byte mismatch: line endings differ (CRLF vs LF)"]
+                    else:
+                        golden_text = golden_bytes.decode("utf-8", errors="replace")
+                        candidate_text = candidate_bytes.decode("utf-8", errors="replace")
+                        regress_diffs = _unified_diff(
+                            golden_text,
+                            candidate_text,
+                            fromfile=str(golden.out_path),
+                            tofile=str(engine_out_path),
+                            max_lines=max_diffs,
+                        )
+                    if not keep_going:
+                        return JobResult(
+                            input=str(input_path),
+                            job_id=job_id,
+                            engine="rust",
+                            status="failed",
+                            job_dir=str(job_dir),
+                            pairs_json=str(pairs_path),
+                            out_path=str(engine_out_path),
+                            error=".out regression mismatch",
+                            regress_ok=False,
+                            regress_diffs=regress_diffs,
+                            elapsed_ms=int((time.time() - started) * 1000),
+                        )
+            else:
+                raise ValueError(f"unknown regress_mode: {regress_mode}")
 
         return JobResult(
             input=str(input_path),
@@ -665,6 +738,7 @@ def _run_one_rust(
             status="ok",
             job_dir=str(job_dir),
             pairs_json=str(pairs_path),
+            out_path=str(engine_out_path),
             regress_ok=regress_ok,
             regress_diffs=regress_diffs,
             elapsed_ms=int((time.time() - started) * 1000),
@@ -729,10 +803,17 @@ def _cmd_run(args: argparse.Namespace) -> int:
         return 2
 
     repo = _repo_root()
-    rnaview_bin = Path(args.rnaview_bin).resolve() if args.rnaview_bin else (repo / "bin" / "rnaview")
-    if not rnaview_bin.exists():
-        sys.stderr.write(f"missing rnaview binary: {rnaview_bin} (build via tools/build_legacy_rnaview.sh)\n")
+    rust_oracle = str(getattr(args, "rust_oracle", "legacy"))
+    if rust_oracle not in ("legacy", "out", "compute"):
+        sys.stderr.write(f"invalid --rust-oracle: {rust_oracle}\n")
         return 2
+
+    rnaview_bin: Path | None = None
+    if engine == "legacy" or (engine == "rust" and rust_oracle == "legacy"):
+        rnaview_bin = Path(args.rnaview_bin).resolve() if args.rnaview_bin else (repo / "bin" / "rnaview")
+        if not rnaview_bin.exists():
+            sys.stderr.write(f"missing rnaview binary: {rnaview_bin} (build via tools/build_legacy_rnaview.sh)\n")
+            return 2
 
     regress_index: RegressIndex | None = None
     if args.regress:
@@ -741,9 +822,6 @@ def _cmd_run(args: argparse.Namespace) -> int:
             sys.stderr.write(f"missing manifest: {manifest}\n")
             return 2
         regress_index = _build_regress_index(manifest)
-        if str(getattr(args, "regress_mode", "core")) != "core" and engine == "rust":
-            sys.stderr.write("--engine rust only supports --regress-mode core (for now)\n")
-            return 2
 
     out_core_mod = _load_module("rnaview_out_core", repo / "tools" / "rnaview_out_core.py")
     pairs_mod = _load_module("rnaview_pairs_json", repo / "tools" / "rnaview_pairs_json.py")
@@ -761,6 +839,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
     results: list[JobResult] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=int(args.workers)) as ex:
         if engine == "legacy":
+            assert rnaview_bin is not None
             futs = [
                 ex.submit(
                     _run_one_legacy,
@@ -789,8 +868,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
                     job_id_mode=args.job_id_mode,
                     overwrite=bool(args.overwrite),
                     rust_bin=rust_bin,
-                    legacy_bin=rnaview_bin,
                     mmcif_parser=str(getattr(args, "mmcif_parser", "legacy")),
+                    rust_oracle=rust_oracle,
+                    legacy_bin=rnaview_bin,
                     out_core_mod=out_core_mod,
                     regress_index=regress_index,
                     regress_mode=str(getattr(args, "regress_mode", "core")),
@@ -822,6 +902,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
                 "job_dir": r.job_dir,
                 "pairs_json": r.pairs_json,
                 "legacy_out": r.legacy_out,
+                "out_path": r.out_path,
                 "error": r.error,
                 "regress_ok": r.regress_ok,
                 "regress_diffs": r.regress_diffs,
@@ -855,6 +936,12 @@ def main(argv: list[str] | None = None) -> int:
         help="For --engine rust: use legacy RNAVIEW mmCIF parsing, or convert via pdbtbx then run legacy PDB parser",
     )
     run.add_argument(
+        "--rust-oracle",
+        choices=["legacy", "out", "compute"],
+        default="legacy",
+        help="For --engine rust: use legacy binary oracle, read <input>.out next to input (No-C dev mode), or compute via pure Rust",
+    )
+    run.add_argument(
         "--job-id-mode",
         choices=["stem-hash", "name-hash", "stem", "name"],
         default="stem-hash",
@@ -867,7 +954,7 @@ def main(argv: list[str] | None = None) -> int:
         "--regress-mode",
         choices=["core", "out"],
         default="core",
-        help="For --regress: compare extracted core JSON, or compare full .out text (legacy engine only)",
+        help="For --regress: compare extracted core JSON, or compare full .out bytes (legacy/rust engines)",
     )
     run.add_argument("--manifest", default=None, help="Path to golden_core/manifest.json (default: test/golden_core/manifest.json)")
     run.add_argument("--max-diffs", type=int, default=50, help="Max diff lines to record on mismatch")

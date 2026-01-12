@@ -64,6 +64,7 @@ if python3 "$ROOT_DIR/tools/rnaview_batch.py" run \
   --out-dir "$OUT_DIR" \
   --engine rust \
   --regress \
+  --regress-mode out \
   --keep-going; then
   rm -rf "$OUT_DIR"
   exit 0

@@ -32,13 +32,25 @@ bash tools/cargo_sysroot.sh test --manifest-path rust/Cargo.toml
 
 ## Usage
 
-### `PDB/mmCIF -> pairs.json` (Phase2 bootstrap; uses legacy oracle)
+### `PDB/mmCIF -> pairs.json` (Phase 2 bootstrap)
 
-This currently shells out to the legacy `bin/rnaview` as an oracle, then parses the generated `.out` into `pairs.json`.
+By default this shells out to the legacy `bin/rnaview` as an oracle, then parses the generated `.out` into `pairs.json`.
 
 ```bash
 RNAVIEW="$(pwd)" bash tools/cargo_sysroot.sh run --manifest-path rust/Cargo.toml -- \
-  from-structure test/pdb/tr0001/tr0001.pdb -o /tmp/tr0001.pairs.json
+  from-structure test/pdb/tr0001/tr0001.pdb \
+  -o /tmp/tr0001.pairs.json \
+  --emit-out /tmp/tr0001.out
+```
+
+There is also a No-C dev mode which reads a sidecar oracle at `<input>.out` (e.g. `test/pdb/tr0001/tr0001.pdb.out`):
+
+```bash
+bash tools/cargo_sysroot.sh run --manifest-path rust/Cargo.toml -- \
+  from-structure test/pdb/tr0001/tr0001.pdb \
+  --oracle out \
+  -o /tmp/tr0001.pairs.json \
+  --emit-out /tmp/tr0001.out
 ```
 
 ### `.out -> pairs.json`
@@ -64,3 +76,8 @@ Or validate the writer against the frozen golden set:
 ```bash
 python3 tools/rnaview_pairs_json.py validate-golden
 ```
+
+## Phase 2 regressions
+
+- Gate A (legacy + rustcore + rust; byte-exact `.out` regression): `bash test_phase2.sh`
+- Gate B (No-C; Rust+Python only): `bash test_phase2_noc.sh`

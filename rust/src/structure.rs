@@ -22,11 +22,22 @@ struct ResidueKey {
 }
 
 #[derive(Debug, Clone)]
-struct AtomRec {
-    name: String,
-    x: f64,
-    y: f64,
-    z: f64,
+pub(crate) struct AtomRec {
+    pub(crate) name: String,
+    pub(crate) x: f64,
+    pub(crate) y: f64,
+    pub(crate) z: f64,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ResidueAtoms {
+    pub chain: char,
+    pub resseq: i32,
+    pub insertion_code: Option<char>,
+    pub resname: String,
+    pub ry: i32,
+    pub base: char,
+    pub atoms: Vec<AtomRec>,
 }
 
 fn canonical_atom_name(raw: &str) -> String {
@@ -43,6 +54,19 @@ fn canonical_atom_name(raw: &str) -> String {
         "O3T" => "O3'".to_string(),
         _ => s,
     }
+}
+
+fn legacy_mmcif_should_discard_h_atom(raw: &str) -> bool {
+    let s = raw.trim();
+    if s.is_empty() {
+        return false;
+    }
+    let len = s.chars().count();
+    let idx = if len == 4 { 1 } else { 0 };
+    let Some(ch) = s.chars().nth(idx) else {
+        return false;
+    };
+    ch.to_ascii_uppercase() == 'H'
 }
 
 fn canonical_residue_name(raw: &str) -> String {
@@ -159,6 +183,7 @@ pub(crate) fn parse_structure_nucleic_residues(
         .set_only_first_model(true)
         .set_only_atomic_coords(true)
         .set_capitalise_chains(false);
+    let mut is_mmcif = false;
     if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
         match ext.to_ascii_lowercase().as_str() {
             "pdb" | "pdb1" | "ent" => {
@@ -166,6 +191,7 @@ pub(crate) fn parse_structure_nucleic_residues(
             }
             "cif" | "mmcif" => {
                 opts.set_format(Format::Mmcif);
+                is_mmcif = true;
             }
             _ => {}
         }
@@ -185,10 +211,13 @@ pub(crate) fn parse_structure_nucleic_residues(
     for h in pdb.atoms_with_hierarchy() {
         let chain_id = h.chain().id().to_string();
         let resseq = i32::try_from(h.residue().serial_number()).unwrap_or(9999);
-        let insertion_code = h
+        let mut insertion_code = h
             .residue()
             .insertion_code()
             .and_then(|s| s.chars().next());
+        if is_mmcif && (insertion_code.is_none() || insertion_code == Some('.')) {
+            insertion_code = Some('?');
+        }
         let resname = canonical_residue_name(h.conformer().name());
         if resname == "HOH" || resname == "WAT" {
             continue;
@@ -201,9 +230,13 @@ pub(crate) fn parse_structure_nucleic_residues(
             resname,
         };
         let serial = h.atom().serial_number();
+        let name = canonical_atom_name(h.atom().name());
         let atoms = groups.entry(key).or_insert_with(BTreeMap::new);
+        if atoms.values().any(|a| a.name == name) {
+            continue;
+        }
         atoms.entry(serial).or_insert_with(|| AtomRec {
-            name: canonical_atom_name(h.atom().name()),
+            name,
             x: h.atom().x(),
             y: h.atom().y(),
             z: h.atom().z(),
@@ -333,9 +366,229 @@ pub(crate) fn parse_structure_nucleic_residues(
     Ok(out)
 }
 
+pub(crate) fn parse_structure_nucleic_residues_with_atoms(path: &Path) -> std::io::Result<Vec<ResidueAtoms>> {
+    let mut opts = ReadOptions::new();
+    opts.set_level(StrictnessLevel::Loose)
+        .set_discard_hydrogens(true)
+        .set_only_first_model(true)
+        .set_only_atomic_coords(true)
+        .set_capitalise_chains(false);
+    let mut is_mmcif = false;
+    if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+        match ext.to_ascii_lowercase().as_str() {
+            "pdb" | "pdb1" | "ent" => {
+                opts.set_format(Format::Pdb);
+            }
+            "cif" | "mmcif" => {
+                opts.set_format(Format::Mmcif);
+                is_mmcif = true;
+                // Mimic legacy CIF parsing quirks:
+                // legacy attempts to remove hydrogens, but due to an indexing bug it keeps
+                // some 4-character H atom names (e.g., H5''/H2''). We read H atoms here and
+                // apply the same filter after parsing.
+                opts.set_discard_hydrogens(false);
+            }
+            _ => {}
+        }
+    }
+
+    let path_str = path.to_string_lossy();
+    let (pdb, _warnings) = opts.read(path_str.as_ref()).map_err(|errs| {
+        let msg = errs
+            .iter()
+            .map(|e| e.to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
+        std::io::Error::new(std::io::ErrorKind::InvalidData, msg)
+    })?;
+
+    let mut groups: HashMap<ResidueKey, BTreeMap<usize, AtomRec>> = HashMap::new();
+    for h in pdb.atoms_with_hierarchy() {
+        let chain_id = h.chain().id().to_string();
+        let resseq = i32::try_from(h.residue().serial_number()).unwrap_or(9999);
+        let mut insertion_code = h
+            .residue()
+            .insertion_code()
+            .and_then(|s| s.chars().next());
+        if is_mmcif && (insertion_code.is_none() || insertion_code == Some('.')) {
+            insertion_code = Some('?');
+        }
+        let resname = canonical_residue_name(h.conformer().name());
+        if resname == "HOH" || resname == "WAT" {
+            continue;
+        }
+
+        let key = ResidueKey {
+            chain_id,
+            resseq,
+            insertion_code,
+            resname,
+        };
+        let serial = h.atom().serial_number();
+        if is_mmcif && legacy_mmcif_should_discard_h_atom(h.atom().name()) {
+            continue;
+        }
+        let name = canonical_atom_name(h.atom().name());
+        let atoms = groups.entry(key).or_insert_with(BTreeMap::new);
+        if atoms.values().any(|a| a.name == name) {
+            continue;
+        }
+        atoms.entry(serial).or_insert_with(|| AtomRec {
+            name,
+            x: h.atom().x(),
+            y: h.atom().y(),
+            z: h.atom().z(),
+        });
+    }
+
+    let mut by_res_id: HashMap<(String, i32, Option<char>), Vec<ResidueKey>> = HashMap::new();
+    for key in groups.keys() {
+        by_res_id
+            .entry((key.chain_id.clone(), key.resseq, key.insertion_code))
+            .or_default()
+            .push(key.clone());
+    }
+
+    let mut order_key: HashMap<ResidueKey, usize> = HashMap::new();
+    for (_res_id, keys) in &by_res_id {
+        if keys.len() <= 1 {
+            continue;
+        }
+        let mut serial_count: HashMap<usize, usize> = HashMap::new();
+        for key in keys {
+            if let Some(atoms) = groups.get(key) {
+                for serial in atoms.keys() {
+                    *serial_count.entry(*serial).or_insert(0) += 1;
+                }
+            }
+        }
+
+        for key in keys {
+            let Some(atoms) = groups.get(key) else {
+                continue;
+            };
+            let Some(overall_min) = atoms.keys().next().copied() else {
+                continue;
+            };
+            let exclusive_min = atoms
+                .keys()
+                .filter(|s| serial_count.get(s).copied().unwrap_or(0) == 1)
+                .min()
+                .copied();
+            order_key.insert(key.clone(), exclusive_min.unwrap_or(overall_min));
+        }
+
+        let mut best_key: Option<ResidueKey> = None;
+        let mut best_score: Option<(usize, usize, String)> = None;
+        for key in keys {
+            let Some(atoms) = groups.get(key) else {
+                continue;
+            };
+            let Some(overall_min) = atoms.keys().next().copied() else {
+                continue;
+            };
+            let exclusive_min = atoms
+                .keys()
+                .filter(|s| serial_count.get(s).copied().unwrap_or(0) == 1)
+                .min()
+                .copied();
+            let priority = if exclusive_min.is_some() { 0usize } else { 1usize };
+            let primary = exclusive_min.unwrap_or(overall_min);
+            let score = (priority, primary, key.resname.clone());
+            let is_better = match best_score.as_ref() {
+                None => true,
+                Some(b) => score < *b,
+            };
+            if is_better {
+                best_score = Some(score);
+                best_key = Some(key.clone());
+            }
+        }
+
+        let Some(owner) = best_key else {
+            continue;
+        };
+
+        for key in keys {
+            if key == &owner {
+                continue;
+            }
+            if let Some(atoms) = groups.get_mut(key) {
+                atoms.retain(|serial, _| serial_count.get(serial).copied().unwrap_or(0) == 1);
+            }
+        }
+    }
+
+    groups.retain(|_, atoms| !atoms.is_empty());
+
+    let mut entries: Vec<(usize, ResidueKey, Vec<AtomRec>)> = Vec::new();
+    for (key, atoms_by_serial) in groups {
+        let min_serial = order_key
+            .get(&key)
+            .copied()
+            .unwrap_or_else(|| *atoms_by_serial.keys().next().expect("non-empty"));
+        let atoms: Vec<AtomRec> = atoms_by_serial.into_iter().map(|(_, a)| a).collect();
+        entries.push((min_serial, key, atoms));
+    }
+    entries.sort_by(|a, b| {
+        (
+            a.0,
+            &a.1.chain_id,
+            a.1.resseq,
+            &a.1.resname,
+        )
+            .cmp(&(
+                b.0,
+                &b.1.chain_id,
+                b.1.resseq,
+                &b.1.resname,
+            ))
+    });
+
+    let mut out: Vec<ResidueAtoms> = Vec::new();
+    for (_min_serial, key, atoms) in entries {
+        let ry = residue_ident(&atoms);
+        if ry < 0 {
+            continue;
+        }
+        let base = base_from_resname_or_infer(&key.resname, ry, &atoms);
+        let chain = key.chain_id.chars().next().unwrap_or(' ');
+        out.push(ResidueAtoms {
+            chain,
+            resseq: key.resseq,
+            insertion_code: key.insertion_code,
+            resname: key.resname,
+            ry,
+            base,
+            atoms,
+        });
+    }
+    Ok(out)
+}
+
 pub fn parse_structure_bases(path: &Path) -> std::io::Result<Vec<BaseResidue>> {
     let residues = parse_structure_nucleic_residues(path)?;
     let mut out: Vec<BaseResidue> = Vec::new();
+
+    let mut idx = 0usize;
+    while idx < residues.len() {
+        let chain = residues[idx].chain;
+        let start = idx;
+        idx += 1;
+        while idx < residues.len() && residues[idx].chain == chain {
+            idx += 1;
+        }
+        if idx - start > 1 {
+            out.extend_from_slice(&residues[start..idx]);
+        }
+    }
+
+    Ok(out)
+}
+
+pub(crate) fn parse_structure_bases_with_atoms(path: &Path) -> std::io::Result<Vec<ResidueAtoms>> {
+    let residues = parse_structure_nucleic_residues_with_atoms(path)?;
+    let mut out: Vec<ResidueAtoms> = Vec::new();
 
     let mut idx = 0usize;
     while idx < residues.len() {

@@ -13,6 +13,7 @@
 - **Phase 2（强约束）**：
   - 对同一输入与同一组选项，`FILEOUT.out` **逐字节一致**（可直接 `diff`）。
   - **No-C**：最终交付路径不依赖 C（不编译/链接 C，也不 shell out legacy 二进制）；legacy 仅允许作为测试/回归 oracle。
+  - 验收脚本（当前仓库）：Gate A `test_phase2.sh`；Gate B `test_phase2_noc.sh`。
 - **批处理优先（第一阶段）**：支持“很多结构跑库”的高吞吐执行、可并发、可重跑、可汇总。
 - **技术分工**：对性能有要求的区域用 Rust；编排、批处理、落盘与生态集成用 Python。
 - **权威结构化输出**：`pairs.json`（确定性序列化，可字节级 diff）。
@@ -252,6 +253,7 @@ Rust (Hot Core Engine)
 - 输出布局（建议）：
   - `<out_dir>/<job_id>/pairs.json`
   - `<out_dir>/<job_id>/legacy.out`（若 engine=legacy，便于审计）
+  - `<out_dir>/<job_id>/engine.out`（若 engine=rust；byte-exact 回归可对它做 diff，路径也会写入 `summary.json` 的 `out_path`）
   - `<out_dir>/summary.json`（成功/失败计数、错误列表、耗时）
 - 退出码：
   - `0`：全部成功且通过回归（`core`/`.out`，若启用）

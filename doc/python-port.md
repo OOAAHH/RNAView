@@ -155,6 +155,7 @@ Phase 2 有两道门槛（建议都写进里程碑）：
   5. `all_pairs()` 枚举/去重/tertiary 标注对齐
 - 验收：对同一输入与同一组选项，`FILEOUT.out` 必须与 golden/legacy **逐字节一致**（可直接 `diff`）。
   - 基准/剖析建议用 release 构建：`bash tools/build_rnaview_rustcore_release.sh`，并用 `python3 tools/rnaview_bench.py compare --rustcore-bin bin/rnaview_rustcore_release ...` 对比。
+  - 当前仓库脚本：`bash test_phase2.sh`（会跑 legacy / rustcore / rust 三条路径，并用 `--regress-mode out` 做 byte-exact 回归）。
 
 #### Gate B：纯 Rust core + Python 编排（No-C，Phase 2 最终验收）
 
@@ -167,6 +168,10 @@ Phase 2 有两道门槛（建议都写进里程碑）：
   - 构建：仅依赖 `cargo build --release` + Python 运行环境（不编译/链接任何 C；不需要 `make/cc/gcc`）。
   - 运行：批处理/单文件运行不调用 `bin/rnaview`/`bin/rnaview_rustcore`（legacy 只允许作为测试 oracle）。
   - 输出：回归集 `.out` 逐字节一致（同 Gate A），并且 `pairs.json` 与 golden core 等价。
+
+补充（现状落地）：
+- 当前仓库已提供 Gate B 的“无 C 验收脚本”骨架：`bash test_phase2_noc.sh`。
+- 目前 Gate B 的 No-C 跑通依赖一个过渡机制：`tools/rnaview_batch.py --engine rust --rust-oracle out`，即 Rust 侧读取 `<input>.out` 作为 oracle（不再 shell out legacy），用于先把“构建/运行不依赖 C + `.out` byte-exact diff”这条链路固化下来；后续实现纯 Rust 计算后，仍可复用同一套 Gate B 回归脚本作为最终验收。
 
 ### Phase 3：工程化与性能（2–6 周）
 

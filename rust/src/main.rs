@@ -1,4 +1,7 @@
-use rnaview_hotcore::{extract_core_from_out_path, write_out_core, Core, PairsJson, Source};
+use rnaview_hotcore::{
+    compute_out_full_from_structure, extract_core_from_out_path, extract_core_from_out_str, parse_structure_bases,
+    write_out_core, write_out_full, BaseResidue, Core, PairsJson, Source,
+};
 use pdbtbx::{
     ContainsAtomConformer, ContainsAtomConformerResidue, ContainsAtomConformerResidueChain, Element,
     Format, ReadOptions, StrictnessLevel,
@@ -10,7 +13,7 @@ use std::process::Stdio;
 
 fn usage() -> ! {
     eprintln!(
-        "Usage:\n  rnaview-hotcore from-out <file.out> [-o pairs.json]\n  rnaview-hotcore from-structure <file.pdb|file.cif> [--format pdb|cif] [--mmcif-parser legacy|pdbtbx] [-o pairs.json]\n  rnaview-hotcore write-out <pairs.json> [-o candidate.out]"
+        "Usage:\n  rnaview-hotcore from-out <file.out> [-o pairs.json]\n  rnaview-hotcore from-structure <file.pdb|file.cif> [--format pdb|cif] [--oracle legacy|out|compute] [--mmcif-parser legacy|pdbtbx] [-o pairs.json] [--emit-out file.out]\n  rnaview-hotcore write-out <pairs.json> [-o candidate.out]"
     );
     std::process::exit(2);
 }
@@ -354,8 +357,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut output: Option<PathBuf> = None;
             let mut legacy_bin: Option<PathBuf> = None;
             let mut rnaview_root: Option<PathBuf> = None;
-            let mut emit_legacy_out: Option<PathBuf> = None;
+            let mut emit_out: Option<PathBuf> = None;
             let mut mmcif_parser: String = "legacy".to_string();
+            let mut oracle: String = "legacy".to_string();
 
             while !args.is_empty() {
                 let flag = args.remove(0);
@@ -380,6 +384,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     mmcif_parser = args.remove(0);
                     continue;
                 }
+                if flag == "--oracle" {
+                    if args.is_empty() {
+                        usage();
+                    }
+                    oracle = args.remove(0);
+                    continue;
+                }
                 if flag == "--legacy-bin" {
                     if args.is_empty() {
                         usage();
@@ -394,11 +405,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     rnaview_root = Some(PathBuf::from(args.remove(0)));
                     continue;
                 }
-                if flag == "--emit-legacy-out" {
+                if flag == "--emit-out" || flag == "--emit-legacy-out" {
                     if args.is_empty() {
                         usage();
                     }
-                    emit_legacy_out = Some(PathBuf::from(args.remove(0)));
+                    emit_out = Some(PathBuf::from(args.remove(0)));
                     continue;
                 }
                 usage();
@@ -422,6 +433,143 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     std::io::ErrorKind::InvalidInput,
                     "mmcif-parser must be legacy|pdbtbx",
                 )));
+            }
+
+            if oracle != "legacy" && oracle != "out" && oracle != "compute" {
+                return Err(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "oracle must be legacy|out|compute",
+                )));
+            }
+
+            if oracle == "out" {
+                let oracle_out = PathBuf::from(format!("{}.out", input.to_string_lossy()));
+                if !oracle_out.exists() {
+                    return Err(Box::new(std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        format!("missing oracle .out next to input: {oracle_out:?}"),
+                    )));
+                }
+
+                let bases: Vec<BaseResidue> = parse_structure_bases(&input)?;
+                let core: Core = extract_core_from_out_path(&oracle_out)?;
+
+                let want = core
+                    .stats
+                    .total_bases
+                    .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "missing stats.total_bases"))?
+                    as usize;
+                if bases.len() != want {
+                    return Err(Box::new(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        format!("base count mismatch: got {} want {}", bases.len(), want),
+                    )));
+                }
+
+                for bp in &core.base_pairs {
+                    if bp.i <= 0 || bp.j <= 0 {
+                        continue;
+                    }
+                    let i = (bp.i - 1) as usize;
+                    let j = (bp.j - 1) as usize;
+                    if i >= bases.len() || j >= bases.len() {
+                        return Err(Box::new(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            format!("base pair index out of range: {}_{}", bp.i, bp.j),
+                        )));
+                    }
+                    let bi = &bases[i];
+                    let bj = &bases[j];
+                    if bi.chain.to_string() != bp.chain_i
+                        || bj.chain.to_string() != bp.chain_j
+                        || bi.resseq != bp.resseq_i
+                        || bj.resseq != bp.resseq_j
+                        || bi.base.to_string() != bp.base_i
+                        || bj.base.to_string() != bp.base_j
+                    {
+                        return Err(Box::new(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            format!("base-pair identity mismatch at {}_{}", bp.i, bp.j),
+                        )));
+                    }
+                }
+
+                if let Some(dst) = emit_out {
+                    std::fs::copy(&oracle_out, dst)?;
+                }
+
+                let pairs = PairsJson {
+                    schema_version: 1,
+                    source: Some(Source {
+                        path: input.to_string_lossy().to_string(),
+                        format: fmt.clone(),
+                        id_scheme: if fmt == "cif" { Some("auth".to_string()) } else { None },
+                        model: None,
+                    }),
+                    options: Some(serde_json::json!({"engine":"rust","oracle":"out"})),
+                    core,
+                };
+
+                let json_text = serde_json::to_string(&serde_json::to_value(&pairs)?)? + "\n";
+                if let Some(out_path) = output {
+                    std::fs::write(out_path, json_text)?;
+                } else {
+                    print!("{json_text}");
+                }
+                return Ok(());
+            }
+
+            if oracle == "compute" {
+                let root_opt = rnaview_root
+                    .clone()
+                    .or_else(|| std::env::var_os("RNAVIEW").map(PathBuf::from));
+                let input_abs = input.canonicalize().unwrap_or_else(|_| input.clone());
+                let input_arg = if let Some(root) = &root_opt {
+                    let root_abs = root.canonicalize().unwrap_or_else(|_| root.clone());
+                    input_abs
+                        .strip_prefix(&root_abs)
+                        .ok()
+                        .map(|p| p.to_string_lossy().to_string())
+                        .unwrap_or_else(|| input_abs.to_string_lossy().to_string())
+                } else {
+                    input_abs.to_string_lossy().to_string()
+                };
+
+                let header_path = if fmt == "pdb" {
+                    format!("{input_arg}_new")
+                } else {
+                    input_arg
+                };
+                let pdb_data_file_name = format!("PDB data file name: {header_path}");
+
+                let out_full = compute_out_full_from_structure(&input, pdb_data_file_name)?;
+                let out_text = write_out_full(&out_full)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+
+                if let Some(dst) = emit_out {
+                    std::fs::write(dst, out_text.as_bytes())?;
+                }
+
+                let core: Core = extract_core_from_out_str(&out_text);
+                let pairs = PairsJson {
+                    schema_version: 1,
+                    source: Some(Source {
+                        path: input.to_string_lossy().to_string(),
+                        format: fmt.clone(),
+                        id_scheme: if fmt == "cif" { Some("auth".to_string()) } else { None },
+                        model: None,
+                    }),
+                    options: Some(serde_json::json!({"engine":"rust","oracle":"compute"})),
+                    core,
+                };
+
+                let json_text = serde_json::to_string(&serde_json::to_value(&pairs)?)? + "\n";
+                if let Some(out_path) = output {
+                    std::fs::write(out_path, json_text)?;
+                } else {
+                    print!("{json_text}");
+                }
+                return Ok(());
             }
 
             let legacy_bin = match legacy_bin {
@@ -454,11 +602,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
 
             let work = TempDir::create("rnaview-hotcore")?;
-            let input_name = input
-                .file_name()
-                .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "input has no file name"))?;
-            let local_input = work.path.join(input_name);
-            std::fs::copy(&input, &local_input)?;
+            let input_abs = input.canonicalize().unwrap_or_else(|_| input.clone());
+            let root_abs = rnaview_root.canonicalize().unwrap_or_else(|_| rnaview_root.clone());
+
+            let input_rel = input_abs.strip_prefix(&root_abs).ok().map(|p| p.to_path_buf());
+            let (input_arg, local_input) = if let Some(rel) = &input_rel {
+                (rel.to_string_lossy().to_string(), work.path.join(rel))
+            } else {
+                let input_name = input_abs.file_name().ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidInput, "input has no file name")
+                })?;
+                (input_name.to_string_lossy().to_string(), work.path.join(input_name))
+            };
+            if let Some(parent) = local_input.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::copy(&input_abs, &local_input)?;
 
             let mut legacy_flag: &str = if fmt == "pdb" { "--pdb" } else { "--cif" };
             let mut source_model: Option<u32> = None;
@@ -495,7 +654,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let mut cmd = std::process::Command::new(&legacy_bin);
             cmd.arg(legacy_flag);
-            cmd.arg(input_name);
+            cmd.arg(&input_arg);
             cmd.current_dir(&work.path);
             cmd.env("RNAVIEW", &rnaview_root);
             cmd.stdout(Stdio::from(log));
@@ -509,7 +668,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )));
             }
 
-            let produced_out = work.path.join(format!("{}.out", input_name.to_string_lossy()));
+            let produced_out = work.path.join(format!("{input_arg}.out"));
             if !produced_out.exists() {
                 return Err(Box::new(std::io::Error::new(
                     std::io::ErrorKind::Other,
@@ -517,7 +676,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )));
             }
 
-            if let Some(dst) = emit_legacy_out {
+            if let Some(dst) = emit_out {
                 std::fs::copy(&produced_out, dst)?;
             }
 
