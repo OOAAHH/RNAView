@@ -244,6 +244,33 @@ Rust (Hot Core Engine)
 - `pair_type_counts` 按 key 排序；
 - JSON 序列化固定：`sort_keys=true`、固定 `separators`、UTF-8、无随机字段（时间戳等）。
 
+#### 3.3.3 Semantics & Policies（Phase 3+）
+
+为了把 **Phase 2 的 byte-exact 兼容性** 与 **Phase 3 的科学修复** 解耦，新系统引入显式的：
+
+- `--semantics legacy-v1|science-v1`：一个“语义预设（preset）”，定义默认 policy 组合。
+- 一组可组合的 `policy`：用户可以按自己的科学假设覆盖 preset 的默认值。
+
+这些参数必须写入 `pairs.json.options`（**落盘 + 可追溯**），以保证批处理结果可复现、可审计。
+
+当前第一批 policy（结构解析层）：
+
+- `structure.hydrogen_policy`
+  - `legacy-mmcif-bug`：复刻 legacy mmCIF 去氢 bug（保留部分 4 字符 H 原子名），用于 `legacy-v1` 的 byte-exact 回归。
+  - `discard-all`：彻底去氢（科学模式默认）。
+  - `keep-all`：保留所有氢（用于研究“氢坐标对分类的影响”，不保证与 legacy 一致）。
+- `structure.missing_insertion_code_policy`
+  - `legacy-question-mark`：复刻 legacy：mmCIF 缺失/`.` 的 insertion code 被映射为 `?`。
+  - `none`：科学模式：mmCIF 缺失/`.`/`?` 的 insertion code 视为缺失（`None`）。
+- `structure.chain_id_policy`
+  - `legacy-1char`：复刻 legacy：链 ID 截断为 1 字符（可能产生碰撞）。
+  - `unique-1char`：将不同链 ID 映射到不同的 1 字符（保持 `.out` 格式要求，同时避免碰撞）。
+
+接口约束：
+
+- 这些参数仅对 **`--oracle compute`（纯 Rust 计算）** 生效；对 `legacy/out` oracle 不允许传入（避免误导性的“伪科学配置”）。
+- `legacy-v1` 的 `.out(full)` 必须保持 byte-exact，因此 **不得**在 `.out` 文本中增加任何新字段；追溯信息写入 `pairs.json.options`。
+
 ### 3.5 批处理（第一阶段）建议的外部接口契约
 
 > 这是面向“跑库”的接口 spec（不绑定具体实现）。

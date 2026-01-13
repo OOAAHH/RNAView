@@ -175,6 +175,7 @@ Phase 2 有两道门槛（建议都写进里程碑）：
 
 ### Phase 3：工程化与性能（2–6 周）
 
+- Semantics/Policy 显式建模：引入 `--semantics legacy-v1|science-v1` 与可组合 policy（并落盘到 `pairs.json.options`），把“byte-exact 兼容”与“科学修复”解耦。
 - CI/可重复构建：把回归（core + `.out`）与基准跑进 CI；提供“一键跑套件 + 产出报告”的脚本。
 - API/CLI 稳定化：错误码、日志、schema 版本策略；为跑库提供更清晰的失败定位信息。
 - 性能优化：在不改变结果的前提下做空间筛选与并行（并用基准锁住收益）。
@@ -216,3 +217,115 @@ Phase 2 有两道门槛（建议都写进里程碑）：
 2. 交付 Python 批处理 CLI：并行跑 `bin/rnaview`，生成 `pairs.json`，并用上面的脚本对照 golden。
 3. Phase 2 Gate A：继续用 `.out` 字节级回归锁住热点替换的正确性，并用 profile/bench 找到真实热点。
 4. Phase 2 Gate B：定义 “No-C + `.out` byte-exact” 的验收脚本与交付物（纯 Rust core + `.out` writer），逐步替换掉 legacy oracle 与 C pipeline。
+
+
+
+Phase 3：工程化 + 科学模式（含去氢 bug 修复）
+M3.0 语义/模式接口定稿（最关键的第一步）
+接口设计（Rust CLI + Python 编排）
+在 Rust from-structure --oracle compute 增加一个顶层模式：--semantics legacy-v1|science-v1
+legacy-v1：现有 Gate B 行为（包含 mmCIF 去氢 bug 兼容、链 ID 截断等 legacy 行为）。
+science-v1：新“科学模式”（修复去氢 bug 等）。
+可选：把关键可变点拆成可组合 policy（也可先不开放给用户，只在 science-v1 内固定）：
+--hydrogen-policy discard-all|keep-all|legacy-mmcif-bug
+--chain-id-policy legacy-1char|full（呼应 spec.md (line 138)、spec.md (line 275)）
+--mmcif-id-scheme auth|label
+--nmr-model-policy legacy|first|representative
+落盘与可追溯
+pairs.json 里必须记录 semantics 与关键 policy（保持可审计、可复现）；.out 在 legacy-v1 下绝不能加新字段（否则 byte‑exact 破坏），science-v1 可选择不扩展 .out、只在 pairs.json 记录。
+验收
+Gate B（bash test_phase2_noc.sh）必须继续全绿，证明 legacy-v1 没被破坏。
+M3.1 Gate C（科学模式）定义与落地
+Gate C 目标
+不再追求与 legacy .out byte‑exact；而是对“科学模式的变化”做透明化、可审核、可批准的管理。
+Gate C 执行方式（建议）
+对同一批输入同时跑两次：
+legacy-v1（基线，用于对照与解释变化）
+science-v1（新语义）
+产出“差异报告”，并用 allowlist（批准清单）控制哪些差异是“已接受的科学修复”。
+Gate C 输出目录与格式（建议）
+脚本：rnaview_gate_c.py（新）
+输出：
+summary.json（Gate C 自己的 schema）
+report.md（人读）
+pairs.json、engine.out
+pairs.json、engine.out
+diff.json（结构化差异）
+summary.json（示例 schema）：
+schema_version
+semantics: { "baseline": "legacy-v1", "candidate": "science-v1" }
+counts: { ok, changed, unapproved, failed }
+results[]: 每个 input 的 paths + diff 摘要（增删改 pair 数、stats 变化、multiplets 变化）
+差异报告脚本（怎么做）
+输入：两个 pairs.json（直接比 core；spec.md (line 264) 定义了 core 的等价字段）
+diff 逻辑（务实且可解释）：
+stats_delta: total_pairs/total_bases + type_counts 逐项 diff
+base_pairs_delta：
+added: 只在 science 出现
+removed: 只在 legacy 出现
+changed: 同一 (i,j,kind) 存在但 lw/orientation/note/syn/... 变化（输出字段级别变更）
+multiplets_delta: added/removed（必要时再细分）
+输出：
+diff.json（给机器审核/allowlist）
+report.md（给人审阅：按“变化最大 case”“变化类型分布”“最常变化的 pair 类型”汇总）
+allowlist 机制（让 Gate C 可 CI 化）
+文件：gate_c_allowlist.yaml（新）
+规则：Gate C 只有在“所有 diff 都在 allowlist”时才通过；否则标记 unapproved 并失败。
+allowlist 条目建议以稳定 key 描述：input + (i,j,kind) + field deltas，并附 reason/issue_id.
+M3.2 “去氢 bug”在 science-v1 中的修复（你关心的核心）
+目标
+science-v1：mmCIF/PDB 均执行“正确且一致”的去氢策略（通常是 discard-all hydrogens，优先用元素字段判断）。
+legacy-v1：保持现状（继续复刻 legacy bug，用于 byte‑exact）。
+验收
+Gate B 继续全绿（legacy-v1）。
+Gate C 中预期只出现“与去氢相关的差异”，并全部进入 allowlist；后续任何新差异都必须解释/批准。
+M3.3 测试矩阵扩充（把 Phase3 的风险覆盖住）
+围绕 spec.md (line 264) 的 core + 结构解析风险点，建议新增/明确矩阵（每一类至少 1–2 个 fixture）：
+
+格式维度：PDB / mmCIF(auth) / mmCIF(label)
+模型维度：X-ray 单模型 / NMR 多模型（含 representative 字段 & 不含）
+编号维度：insertion code（PDB & mmCIF 的 ./? 等异常）
+链维度：单字符 chain / 多字符 label_asym_id（用于决定 chain-id-policy）
+氢维度：无氢 / 有氢且含 4 字符氢名（触发本次 bug）/ 有氢但元素字段缺失
+化学维度：修饰碱基、PSU、I 等
+几何维度：含 tertiary、含 multiplets、含 stacked
+验收分配
+legacy-v1：继续走 .out byte‑exact（Gate B）
+science-v1：走 Gate C（差异报告 + allowlist），后续稳定后可再冻结 science goldens（见下一条）
+M3.4 冻结 “science-v1” 的 golden（让科学模式也可回归）
+当 Gate C 的差异已经被充分解释并批准后：
+固化一套 science-v1 的 golden（建议先固化 pairs.json core，再决定是否也固化 .out）。
+新增回归脚本：例如 test_phase3_science.sh：跑 science-v1 并对 test/golden_science_core/ 做 compare。
+这一步完成后，science-v1 也从“解释差异”进入“稳定回归”。
+M3.5 工程化与性能（补齐 python-port.md (line 176) 的内容）
+CI：分层跑
+Gate B（byte‑exact No‑C）
+Gate C（science diff + allowlist）
+bench（只监控性能，不做硬门槛或设阈值报警）
+性能：只在不改变 legacy-v1 结果前提下优化（空间索引、邻域筛选、并行），并用基准锁住收益。
+Phase 4：渲染与格式现代化（在不动 core 的前提下扩展产物）
+M4.0 输出契约与 API 分层（先定“中间表示”，再定渲染）
+定一个确定性的 2D 中间格式（建议 layout.json），让渲染变成纯函数：
+输入：pairs.json（legacy-v1 或 science-v1 都可）
+输出：layout.json（坐标、边、标签、样式 key）
+.ps/.svg/.png 都从 layout.json 生成，避免把“布局不确定性”散落在渲染端。
+M4.1 2D：SVG 优先，PS 兼容（呼应 python-port.md (line 182)）
+新增 render 子命令（Python 侧更合适），例如：
+rnaview render --input pairs.json --format svg|png|pdf|ps
+PS 不追求 byte‑exact（通常做不到），但要保证结构/标注一致（用 Gate D 验收）。
+M4.2 3D：保留 VRML，新增更现代出口
+VRML 作为 legacy 兼容输出；新增 glTF 或生成 PyMOL/ChimeraX 脚本（可复用生态）。
+M4.3 Gate D（渲染验收）
+不做 byte‑exact；做“结构一致 + 低噪声”的回归：
+对 layout.json 做确定性 diff（首选）
+或对 SVG 做 normalization 后 diff（去掉时间戳/随机 id/浮点抖动）
+或做像素级快照（成本高，后置）
+哪些必须 byte‑exact？哪些可以科学修复？
+必须保持 byte‑exact（对 legacy golden）
+legacy-v1 下的 FILEOUT.out 全文（Gate B），包含解析/过滤/排序/空格/换行等所有历史行为。
+可以“科学修复”（但必须在 science-v1，并受 Gate C 管控）
+mmCIF 去氢 bug（你指出的点）
+mmCIF chain id 截断策略（见 spec.md (line 138)、spec.md (line 275)）
+insertion code 的表示、NMR 选模策略、altloc 策略等（只要是“历史实现细节”而非科学定义）
+两边都必须保持的底线
+同一 semantics + 同一输入 + 同一组选项 ⇒ 输出确定性（pairs.json 必须可 byte‑diff）；只是 science-v1 的 golden 不再是 legacy，而是它自己的版本化 golden/allowlist。

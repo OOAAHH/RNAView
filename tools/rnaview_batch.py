@@ -551,6 +551,10 @@ def _run_one_rust(
     rust_bin: Path,
     mmcif_parser: str,
     rust_oracle: str,
+    semantics: str | None,
+    hydrogen_policy: str | None,
+    missing_insertion_code: str | None,
+    chain_id_policy: str | None,
     legacy_bin: Path | None,
     out_core_mod: Any,
     regress_index: RegressIndex | None,
@@ -604,6 +608,26 @@ def _run_one_rust(
         str(rust_oracle),
         "--mmcif-parser",
         str(mmcif_parser),
+        *(
+            ["--semantics", semantics]
+            if semantics is not None
+            else []
+        ),
+        *(
+            ["--hydrogen-policy", hydrogen_policy]
+            if hydrogen_policy is not None
+            else []
+        ),
+        *(
+            ["--missing-insertion-code", missing_insertion_code]
+            if missing_insertion_code is not None
+            else []
+        ),
+        *(
+            ["--chain-id-policy", chain_id_policy]
+            if chain_id_policy is not None
+            else []
+        ),
         "-o",
         str(pairs_path),
         "--emit-out",
@@ -808,6 +832,18 @@ def _cmd_run(args: argparse.Namespace) -> int:
         sys.stderr.write(f"invalid --rust-oracle: {rust_oracle}\n")
         return 2
 
+    semantics = getattr(args, "semantics", None)
+    hydrogen_policy = getattr(args, "hydrogen_policy", None)
+    missing_insertion_code = getattr(args, "missing_insertion_code", None)
+    chain_id_policy = getattr(args, "chain_id_policy", None)
+    if any([semantics, hydrogen_policy, missing_insertion_code, chain_id_policy]) and not (
+        engine == "rust" and rust_oracle == "compute"
+    ):
+        sys.stderr.write(
+            "--semantics/--hydrogen-policy/--missing-insertion-code/--chain-id-policy require --engine rust --rust-oracle compute\n"
+        )
+        return 2
+
     rnaview_bin: Path | None = None
     if engine == "legacy" or (engine == "rust" and rust_oracle == "legacy"):
         rnaview_bin = Path(args.rnaview_bin).resolve() if args.rnaview_bin else (repo / "bin" / "rnaview")
@@ -870,6 +906,10 @@ def _cmd_run(args: argparse.Namespace) -> int:
                     rust_bin=rust_bin,
                     mmcif_parser=str(getattr(args, "mmcif_parser", "legacy")),
                     rust_oracle=rust_oracle,
+                    semantics=semantics,
+                    hydrogen_policy=hydrogen_policy,
+                    missing_insertion_code=missing_insertion_code,
+                    chain_id_policy=chain_id_policy,
                     legacy_bin=rnaview_bin,
                     out_core_mod=out_core_mod,
                     regress_index=regress_index,
@@ -940,6 +980,30 @@ def main(argv: list[str] | None = None) -> int:
         choices=["legacy", "out", "compute"],
         default="legacy",
         help="For --engine rust: use legacy binary oracle, read <input>.out next to input (No-C dev mode), or compute via pure Rust",
+    )
+    run.add_argument(
+        "--semantics",
+        choices=["legacy-v1", "science-v1"],
+        default=None,
+        help="For --engine rust --rust-oracle compute: choose semantics preset (default: legacy-v1)",
+    )
+    run.add_argument(
+        "--hydrogen-policy",
+        choices=["legacy-mmcif-bug", "discard-all", "keep-all"],
+        default=None,
+        help="For --engine rust --rust-oracle compute: hydrogen handling policy (overrides semantics default)",
+    )
+    run.add_argument(
+        "--missing-insertion-code",
+        choices=["legacy-question-mark", "none"],
+        default=None,
+        help="For --engine rust --rust-oracle compute: how to represent missing mmCIF insertion codes (overrides semantics default)",
+    )
+    run.add_argument(
+        "--chain-id-policy",
+        choices=["legacy-1char", "unique-1char"],
+        default=None,
+        help="For --engine rust --rust-oracle compute: how to map chain IDs to the legacy 1-char output field (overrides semantics default)",
     )
     run.add_argument(
         "--job-id-mode",

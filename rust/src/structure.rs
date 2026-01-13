@@ -2,6 +2,7 @@ use pdbtbx::{
     ContainsAtomConformer, ContainsAtomConformerResidue, ContainsAtomConformerResidueChain,
     Format, ReadOptions, StrictnessLevel,
 };
+use crate::semantics::{ChainIdPolicy, HydrogenPolicy, MissingInsertionCodePolicy, StructurePolicies};
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 
@@ -67,6 +68,92 @@ fn legacy_mmcif_should_discard_h_atom(raw: &str) -> bool {
         return false;
     };
     ch.to_ascii_uppercase() == 'H'
+}
+
+fn normalize_insertion_code(
+    is_mmcif: bool,
+    insertion_code: Option<char>,
+    missing_policy: MissingInsertionCodePolicy,
+) -> Option<char> {
+    if !is_mmcif {
+        return insertion_code;
+    }
+    match missing_policy {
+        MissingInsertionCodePolicy::LegacyQuestionMark => {
+            if insertion_code.is_none() || insertion_code == Some('.') {
+                Some('?')
+            } else {
+                insertion_code
+            }
+        }
+        MissingInsertionCodePolicy::None => {
+            if insertion_code.is_none() || insertion_code == Some('.') || insertion_code == Some('?') {
+                None
+            } else {
+                insertion_code
+            }
+        }
+    }
+}
+
+fn build_chain_id_map<'a>(
+    chain_ids: impl IntoIterator<Item = &'a str>,
+    policy: ChainIdPolicy,
+) -> std::io::Result<HashMap<String, char>> {
+    let mut unique: std::collections::BTreeSet<&'a str> = std::collections::BTreeSet::new();
+    for id in chain_ids {
+        unique.insert(id);
+    }
+
+    match policy {
+        ChainIdPolicy::Legacy1Char => {
+            let mut out = HashMap::new();
+            for id in unique {
+                out.insert(id.to_string(), id.chars().next().unwrap_or(' '));
+            }
+            Ok(out)
+        }
+        ChainIdPolicy::Unique1Char => {
+            const POOL: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+            let mut out: HashMap<String, char> = HashMap::new();
+            let mut used: std::collections::HashSet<char> = std::collections::HashSet::new();
+            let mut pending: Vec<&'a str> = Vec::new();
+
+            for id in unique {
+                if id.chars().count() == 1 {
+                    let c = id.chars().next().unwrap_or(' ');
+                    if used.insert(c) {
+                        out.insert(id.to_string(), c);
+                    } else {
+                        pending.push(id);
+                    }
+                } else {
+                    pending.push(id);
+                }
+            }
+
+            let available: Vec<char> = POOL
+                .iter()
+                .map(|b| *b as char)
+                .filter(|c| !used.contains(c))
+                .collect();
+            let mut pool = available.into_iter();
+
+            for id in pending {
+                let Some(c) = pool.next() else {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "too many distinct chains for --chain-id-policy unique-1char",
+                    ));
+                };
+                used.insert(c);
+                out.insert(id.to_string(), c);
+            }
+
+            Ok(out)
+        }
+    }
 }
 
 fn canonical_residue_name(raw: &str) -> String {
@@ -177,9 +264,16 @@ fn base_from_resname_or_infer(resname: &str, ry: i32, atoms: &[AtomRec]) -> char
 pub(crate) fn parse_structure_nucleic_residues(
     path: &Path,
 ) -> std::io::Result<Vec<BaseResidue>> {
+    let structure_policies = StructurePolicies::legacy_v1_defaults();
+    parse_structure_nucleic_residues_with_policies(path, &structure_policies)
+}
+
+pub(crate) fn parse_structure_nucleic_residues_with_policies(
+    path: &Path,
+    structure_policies: &StructurePolicies,
+) -> std::io::Result<Vec<BaseResidue>> {
     let mut opts = ReadOptions::new();
     opts.set_level(StrictnessLevel::Loose)
-        .set_discard_hydrogens(true)
         .set_only_first_model(true)
         .set_only_atomic_coords(true)
         .set_capitalise_chains(false);
@@ -197,6 +291,15 @@ pub(crate) fn parse_structure_nucleic_residues(
         }
     }
 
+    let apply_legacy_mmcif_h_bug_filter =
+        is_mmcif && structure_policies.hydrogen_policy == HydrogenPolicy::LegacyMmcifBug;
+    let discard_hydrogens = match structure_policies.hydrogen_policy {
+        HydrogenPolicy::DiscardAll => true,
+        HydrogenPolicy::KeepAll => false,
+        HydrogenPolicy::LegacyMmcifBug => !is_mmcif,
+    };
+    opts.set_discard_hydrogens(discard_hydrogens);
+
     let path_str = path.to_string_lossy();
     let (pdb, _warnings) = opts.read(path_str.as_ref()).map_err(|errs| {
         let msg = errs
@@ -211,13 +314,13 @@ pub(crate) fn parse_structure_nucleic_residues(
     for h in pdb.atoms_with_hierarchy() {
         let chain_id = h.chain().id().to_string();
         let resseq = i32::try_from(h.residue().serial_number()).unwrap_or(9999);
-        let mut insertion_code = h
-            .residue()
-            .insertion_code()
-            .and_then(|s| s.chars().next());
-        if is_mmcif && (insertion_code.is_none() || insertion_code == Some('.')) {
-            insertion_code = Some('?');
-        }
+        let insertion_code = normalize_insertion_code(
+            is_mmcif,
+            h.residue()
+                .insertion_code()
+                .and_then(|s| s.chars().next()),
+            structure_policies.missing_insertion_code_policy,
+        );
         let resname = canonical_residue_name(h.conformer().name());
         if resname == "HOH" || resname == "WAT" {
             continue;
@@ -230,6 +333,9 @@ pub(crate) fn parse_structure_nucleic_residues(
             resname,
         };
         let serial = h.atom().serial_number();
+        if apply_legacy_mmcif_h_bug_filter && legacy_mmcif_should_discard_h_atom(h.atom().name()) {
+            continue;
+        }
         let name = canonical_atom_name(h.atom().name());
         let atoms = groups.entry(key).or_insert_with(BTreeMap::new);
         if atoms.values().any(|a| a.name == name) {
@@ -347,6 +453,11 @@ pub(crate) fn parse_structure_nucleic_residues(
             ))
     });
 
+    let chain_map = build_chain_id_map(
+        entries.iter().map(|(_min_serial, key, _atoms)| key.chain_id.as_str()),
+        structure_policies.chain_id_policy,
+    )?;
+
     let mut out: Vec<BaseResidue> = Vec::new();
     for (_min_serial, key, atoms) in entries {
         let ry = residue_ident(&atoms);
@@ -354,7 +465,7 @@ pub(crate) fn parse_structure_nucleic_residues(
             continue;
         }
         let base = base_from_resname_or_infer(&key.resname, ry, &atoms);
-        let chain = key.chain_id.chars().next().unwrap_or(' ');
+        let chain = chain_map.get(key.chain_id.as_str()).copied().unwrap_or(' ');
         out.push(BaseResidue {
             chain,
             resseq: key.resseq,
@@ -367,9 +478,16 @@ pub(crate) fn parse_structure_nucleic_residues(
 }
 
 pub(crate) fn parse_structure_nucleic_residues_with_atoms(path: &Path) -> std::io::Result<Vec<ResidueAtoms>> {
+    let structure_policies = StructurePolicies::legacy_v1_defaults();
+    parse_structure_nucleic_residues_with_atoms_with_policies(path, &structure_policies)
+}
+
+pub(crate) fn parse_structure_nucleic_residues_with_atoms_with_policies(
+    path: &Path,
+    structure_policies: &StructurePolicies,
+) -> std::io::Result<Vec<ResidueAtoms>> {
     let mut opts = ReadOptions::new();
     opts.set_level(StrictnessLevel::Loose)
-        .set_discard_hydrogens(true)
         .set_only_first_model(true)
         .set_only_atomic_coords(true)
         .set_capitalise_chains(false);
@@ -382,14 +500,24 @@ pub(crate) fn parse_structure_nucleic_residues_with_atoms(path: &Path) -> std::i
             "cif" | "mmcif" => {
                 opts.set_format(Format::Mmcif);
                 is_mmcif = true;
-                // Mimic legacy CIF parsing quirks:
-                // legacy attempts to remove hydrogens, but due to an indexing bug it keeps
-                // some 4-character H atom names (e.g., H5''/H2''). We read H atoms here and
-                // apply the same filter after parsing.
-                opts.set_discard_hydrogens(false);
             }
             _ => {}
         }
+    }
+
+    let apply_legacy_mmcif_h_bug_filter =
+        is_mmcif && structure_policies.hydrogen_policy == HydrogenPolicy::LegacyMmcifBug;
+    let discard_hydrogens = match structure_policies.hydrogen_policy {
+        HydrogenPolicy::DiscardAll => true,
+        HydrogenPolicy::KeepAll => false,
+        HydrogenPolicy::LegacyMmcifBug => !is_mmcif,
+    };
+    opts.set_discard_hydrogens(discard_hydrogens);
+    if apply_legacy_mmcif_h_bug_filter {
+        // Legacy mmCIF parsing attempted to remove hydrogens but effectively kept some due to an
+        // indexing bug. To reproduce that behavior, we must read H atoms and apply the same
+        // buggy filter ourselves.
+        opts.set_discard_hydrogens(false);
     }
 
     let path_str = path.to_string_lossy();
@@ -406,13 +534,13 @@ pub(crate) fn parse_structure_nucleic_residues_with_atoms(path: &Path) -> std::i
     for h in pdb.atoms_with_hierarchy() {
         let chain_id = h.chain().id().to_string();
         let resseq = i32::try_from(h.residue().serial_number()).unwrap_or(9999);
-        let mut insertion_code = h
-            .residue()
-            .insertion_code()
-            .and_then(|s| s.chars().next());
-        if is_mmcif && (insertion_code.is_none() || insertion_code == Some('.')) {
-            insertion_code = Some('?');
-        }
+        let insertion_code = normalize_insertion_code(
+            is_mmcif,
+            h.residue()
+                .insertion_code()
+                .and_then(|s| s.chars().next()),
+            structure_policies.missing_insertion_code_policy,
+        );
         let resname = canonical_residue_name(h.conformer().name());
         if resname == "HOH" || resname == "WAT" {
             continue;
@@ -425,7 +553,7 @@ pub(crate) fn parse_structure_nucleic_residues_with_atoms(path: &Path) -> std::i
             resname,
         };
         let serial = h.atom().serial_number();
-        if is_mmcif && legacy_mmcif_should_discard_h_atom(h.atom().name()) {
+        if apply_legacy_mmcif_h_bug_filter && legacy_mmcif_should_discard_h_atom(h.atom().name()) {
             continue;
         }
         let name = canonical_atom_name(h.atom().name());
@@ -545,6 +673,11 @@ pub(crate) fn parse_structure_nucleic_residues_with_atoms(path: &Path) -> std::i
             ))
     });
 
+    let chain_map = build_chain_id_map(
+        entries.iter().map(|(_min_serial, key, _atoms)| key.chain_id.as_str()),
+        structure_policies.chain_id_policy,
+    )?;
+
     let mut out: Vec<ResidueAtoms> = Vec::new();
     for (_min_serial, key, atoms) in entries {
         let ry = residue_ident(&atoms);
@@ -552,7 +685,7 @@ pub(crate) fn parse_structure_nucleic_residues_with_atoms(path: &Path) -> std::i
             continue;
         }
         let base = base_from_resname_or_infer(&key.resname, ry, &atoms);
-        let chain = key.chain_id.chars().next().unwrap_or(' ');
+        let chain = chain_map.get(key.chain_id.as_str()).copied().unwrap_or(' ');
         out.push(ResidueAtoms {
             chain,
             resseq: key.resseq,
@@ -587,7 +720,15 @@ pub fn parse_structure_bases(path: &Path) -> std::io::Result<Vec<BaseResidue>> {
 }
 
 pub(crate) fn parse_structure_bases_with_atoms(path: &Path) -> std::io::Result<Vec<ResidueAtoms>> {
-    let residues = parse_structure_nucleic_residues_with_atoms(path)?;
+    let structure_policies = StructurePolicies::legacy_v1_defaults();
+    parse_structure_bases_with_atoms_with_policies(path, &structure_policies)
+}
+
+pub(crate) fn parse_structure_bases_with_atoms_with_policies(
+    path: &Path,
+    structure_policies: &StructurePolicies,
+) -> std::io::Result<Vec<ResidueAtoms>> {
+    let residues = parse_structure_nucleic_residues_with_atoms_with_policies(path, structure_policies)?;
     let mut out: Vec<ResidueAtoms> = Vec::new();
 
     let mut idx = 0usize;

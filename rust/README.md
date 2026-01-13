@@ -53,6 +53,21 @@ bash tools/cargo_sysroot.sh run --manifest-path rust/Cargo.toml -- \
   --emit-out /tmp/tr0001.out
 ```
 
+### Semantics & policies (Phase 3+)
+
+For `--oracle compute` you can choose an explicit semantics preset, and override individual policies.
+These are written to `pairs.json.options` for traceability.
+
+```bash
+bash tools/cargo_sysroot.sh run --manifest-path rust/Cargo.toml -- \
+  from-structure test/mmcif/nmr_structure/8if5/8if5.cif \
+  --oracle compute \
+  --semantics science-v1 \
+  --hydrogen-policy discard-all \
+  -o /tmp/8if5.pairs.json \
+  --emit-out /tmp/8if5.out
+```
+
 ### `.out -> pairs.json`
 
 ```bash

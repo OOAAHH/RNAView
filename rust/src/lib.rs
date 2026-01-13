@@ -5,6 +5,7 @@ use std::path::Path;
 
 mod structure;
 mod out_full;
+mod semantics;
 mod legacy_alg;
 mod noc_engine;
 mod legacy_pairing;
@@ -12,12 +13,28 @@ mod legacy_pairing;
 mod legacy_ffi;
 pub use structure::{parse_structure_bases, BaseResidue};
 pub use out_full::{parse_out_full, write_out_full, OutEol, OutFull, OutBasePairLine, OutPairKind};
+pub use semantics::{
+    ChainIdPolicy, HydrogenPolicy, MissingInsertionCodePolicy, Policies, Semantics, SemanticsConfig,
+    StructurePolicies,
+};
 
 pub fn compute_out_full_from_structure(
     input_path: &std::path::Path,
     pdb_data_file_name: String,
 ) -> Result<OutFull, String> {
-    noc_engine::compute_out_full_from_structure(input_path, pdb_data_file_name)
+    compute_out_full_from_structure_with_policies(
+        input_path,
+        pdb_data_file_name,
+        &SemanticsConfig::defaults(Semantics::LegacyV1).policies.structure,
+    )
+}
+
+pub fn compute_out_full_from_structure_with_policies(
+    input_path: &std::path::Path,
+    pdb_data_file_name: String,
+    structure_policies: &StructurePolicies,
+) -> Result<OutFull, String> {
+    noc_engine::compute_out_full_from_structure(input_path, pdb_data_file_name, structure_policies)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

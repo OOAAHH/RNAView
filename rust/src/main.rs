@@ -1,6 +1,7 @@
 use rnaview_hotcore::{
-    compute_out_full_from_structure, extract_core_from_out_path, extract_core_from_out_str, parse_structure_bases,
-    write_out_core, write_out_full, BaseResidue, Core, PairsJson, Source,
+    compute_out_full_from_structure_with_policies, extract_core_from_out_path, extract_core_from_out_str,
+    parse_structure_bases, write_out_core, write_out_full, BaseResidue, ChainIdPolicy, Core, HydrogenPolicy,
+    MissingInsertionCodePolicy, PairsJson, Semantics, SemanticsConfig, Source,
 };
 use pdbtbx::{
     ContainsAtomConformer, ContainsAtomConformerResidue, ContainsAtomConformerResidueChain, Element,
@@ -13,7 +14,7 @@ use std::process::Stdio;
 
 fn usage() -> ! {
     eprintln!(
-        "Usage:\n  rnaview-hotcore from-out <file.out> [-o pairs.json]\n  rnaview-hotcore from-structure <file.pdb|file.cif> [--format pdb|cif] [--oracle legacy|out|compute] [--mmcif-parser legacy|pdbtbx] [-o pairs.json] [--emit-out file.out]\n  rnaview-hotcore write-out <pairs.json> [-o candidate.out]"
+        "Usage:\n  rnaview-hotcore from-out <file.out> [-o pairs.json]\n  rnaview-hotcore from-structure <file.pdb|file.cif>\n      [--format pdb|cif]\n      [--oracle legacy|out|compute]\n      [--mmcif-parser legacy|pdbtbx]\n      [--semantics legacy-v1|science-v1]\n      [--hydrogen-policy legacy-mmcif-bug|discard-all|keep-all]\n      [--missing-insertion-code legacy-question-mark|none]\n      [--chain-id-policy legacy-1char|unique-1char]\n      [-o pairs.json]\n      [--emit-out file.out]\n  rnaview-hotcore write-out <pairs.json> [-o candidate.out]"
     );
     std::process::exit(2);
 }
@@ -360,6 +361,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut emit_out: Option<PathBuf> = None;
             let mut mmcif_parser: String = "legacy".to_string();
             let mut oracle: String = "legacy".to_string();
+            let mut semantics: Option<String> = None;
+            let mut hydrogen_policy: Option<String> = None;
+            let mut missing_insertion_code: Option<String> = None;
+            let mut chain_id_policy: Option<String> = None;
 
             while !args.is_empty() {
                 let flag = args.remove(0);
@@ -389,6 +394,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         usage();
                     }
                     oracle = args.remove(0);
+                    continue;
+                }
+                if flag == "--semantics" {
+                    if args.is_empty() {
+                        usage();
+                    }
+                    semantics = Some(args.remove(0));
+                    continue;
+                }
+                if flag == "--hydrogen-policy" {
+                    if args.is_empty() {
+                        usage();
+                    }
+                    hydrogen_policy = Some(args.remove(0));
+                    continue;
+                }
+                if flag == "--missing-insertion-code" {
+                    if args.is_empty() {
+                        usage();
+                    }
+                    missing_insertion_code = Some(args.remove(0));
+                    continue;
+                }
+                if flag == "--chain-id-policy" {
+                    if args.is_empty() {
+                        usage();
+                    }
+                    chain_id_policy = Some(args.remove(0));
                     continue;
                 }
                 if flag == "--legacy-bin" {
@@ -439,6 +472,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Err(Box::new(std::io::Error::new(
                     std::io::ErrorKind::InvalidInput,
                     "oracle must be legacy|out|compute",
+                )));
+            }
+            if oracle != "compute"
+                && (semantics.is_some()
+                    || hydrogen_policy.is_some()
+                    || missing_insertion_code.is_some()
+                    || chain_id_policy.is_some())
+            {
+                return Err(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "--semantics/--hydrogen-policy/--missing-insertion-code/--chain-id-policy require --oracle compute",
                 )));
             }
 
@@ -520,6 +564,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             if oracle == "compute" {
+                let semantics = semantics
+                    .as_deref()
+                    .map(Semantics::parse_cli)
+                    .transpose()
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?
+                    .unwrap_or(Semantics::LegacyV1);
+                let mut structure_policies = SemanticsConfig::defaults(semantics).policies.structure;
+                if let Some(s) = hydrogen_policy.as_deref() {
+                    structure_policies.hydrogen_policy = HydrogenPolicy::parse_cli(s)
+                        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
+                }
+                if let Some(s) = missing_insertion_code.as_deref() {
+                    structure_policies.missing_insertion_code_policy =
+                        MissingInsertionCodePolicy::parse_cli(s)
+                            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
+                }
+                if let Some(s) = chain_id_policy.as_deref() {
+                    structure_policies.chain_id_policy = ChainIdPolicy::parse_cli(s)
+                        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
+                }
+
                 let root_opt = rnaview_root
                     .clone()
                     .or_else(|| std::env::var_os("RNAVIEW").map(PathBuf::from));
@@ -542,7 +607,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 };
                 let pdb_data_file_name = format!("PDB data file name: {header_path}");
 
-                let out_full = compute_out_full_from_structure(&input, pdb_data_file_name)?;
+                let out_full =
+                    compute_out_full_from_structure_with_policies(&input, pdb_data_file_name, &structure_policies)?;
                 let out_text = write_out_full(&out_full)
                     .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
@@ -559,7 +625,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         id_scheme: if fmt == "cif" { Some("auth".to_string()) } else { None },
                         model: None,
                     }),
-                    options: Some(serde_json::json!({"engine":"rust","oracle":"compute"})),
+                    options: Some(serde_json::json!({
+                        "engine":"rust",
+                        "oracle":"compute",
+                        "semantics": semantics.as_str(),
+                        "policies": { "structure": structure_policies },
+                    })),
                     core,
                 };
 

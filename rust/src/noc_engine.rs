@@ -1,7 +1,8 @@
 use crate::legacy_alg::{compute_base_info, AtomName4, ResName3};
 use crate::legacy_pairing::{all_pairs, bp_network_multiplets, pair_type_statistics, uncommon_lines};
 use crate::out_full::{OutEol, OutFull};
-use crate::structure::parse_structure_bases_with_atoms;
+use crate::structure::parse_structure_bases_with_atoms_with_policies;
+use crate::StructurePolicies;
 use std::path::Path;
 
 #[derive(Debug, Clone)]
@@ -46,8 +47,8 @@ fn residue_name_field_legacy(name: &str) -> ResName3 {
     ResName3([b[0], b[1], b[2]])
 }
 
-fn build_legacy_arrays(path: &Path) -> std::io::Result<LegacyArrays> {
-    let residues = parse_structure_bases_with_atoms(path)?;
+fn build_legacy_arrays(path: &Path, structure_policies: &StructurePolicies) -> std::io::Result<LegacyArrays> {
+    let residues = parse_structure_bases_with_atoms_with_policies(path, structure_policies)?;
     let num_residue = residues.len();
 
     let mut seidx: Vec<[usize; 3]> = vec![[0; 3]; num_residue + 1];
@@ -99,8 +100,9 @@ fn build_legacy_arrays(path: &Path) -> std::io::Result<LegacyArrays> {
 pub(crate) fn compute_out_full_from_structure(
     input_path: &Path,
     pdb_data_file_name: String,
+    structure_policies: &StructurePolicies,
 ) -> Result<OutFull, String> {
-    let arrays = build_legacy_arrays(input_path).map_err(|e| e.to_string())?;
+    let arrays = build_legacy_arrays(input_path, structure_policies).map_err(|e| e.to_string())?;
     let base_info = compute_base_info(
         arrays.num_residue,
         &arrays.bseq,
