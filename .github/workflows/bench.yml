@@ -1,0 +1,33 @@
+name: Bench
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * 0"
+
+jobs:
+  bench-phase2:
+    name: "Bench: legacy vs rustcore (phase2 suite)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
+      - run: bash tools/build_legacy_rnaview.sh
+      - run: bash tools/build_rnaview_rustcore_release.sh
+      - run: python3 tools/rnaview_bench.py compare --suite phase2 --runs 3 --legacy-bin bin/rnaview --rustcore-bin bin/rnaview_rustcore_release -o out/bench_phase3.json
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-phase3
+          path: out/bench_phase3.json
+

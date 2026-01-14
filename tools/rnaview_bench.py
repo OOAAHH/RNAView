@@ -584,7 +584,9 @@ def _cmd_profile(args: argparse.Namespace) -> int:
                 "out_sha256": _sha256_bytes(rustcore.out_bytes),
             },
         }
-        Path(args.json).write_text(_json_dumps(out, indent=2), encoding="utf-8")
+        out_path = Path(args.json)
+        _ensure_parent(out_path)
+        out_path.write_text(_json_dumps(out, indent=2), encoding="utf-8")
 
     if verify_ok is False:
         return 1
@@ -793,7 +795,9 @@ def _cmd_compare(args: argparse.Namespace) -> int:
     out["totals"] = {"cases": len(out["cases"]), "failures": failures}
 
     if args.json:
-        Path(args.json).write_text(_json_dumps(out, indent=2), encoding="utf-8")
+        out_path = Path(args.json)
+        _ensure_parent(out_path)
+        out_path.write_text(_json_dumps(out, indent=2), encoding="utf-8")
 
     if failures:
         return 1

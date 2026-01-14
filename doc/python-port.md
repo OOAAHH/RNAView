@@ -328,6 +328,7 @@ M3.4 冻结 “science-v1” 的 golden（让科学模式也可回归）
 这一步完成后，science-v1 也从“解释差异”进入“稳定回归”。
 M3.5 工程化与性能（补齐 python-port.md (line 176) 的内容）
 CI：分层跑（建议拆成独立 job，便于定位失败与并行）
+- GitHub Actions 示例：`.github/workflows/ci.yml`（Gate B/C/science）+ `.github/workflows/bench.yml`（bench，scheduled/dispatch）
 - Gate B（byte‑exact No‑C）：`bash test_phase2_noc.sh`
 - Gate C（science diff + allowlist）：`bash test_phase3_gate_c.sh`
 - science-v1 回归（frozen goldens）：`bash test_phase3_science.sh`
