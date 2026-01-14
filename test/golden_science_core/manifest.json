@@ -1,0 +1,137 @@
+{
+  "counts": {
+    "failed": 0,
+    "ok": 15,
+    "reused_legacy_core": 14,
+    "written": 1
+  },
+  "elapsed_ms": 12047,
+  "entries": [
+    {
+      "core_json": "test/golden_core/mmcif/insertion_code/1EFW/1EFW.cif.core.json",
+      "error": null,
+      "input": "test/mmcif/insertion_code/1EFW/1EFW.cif",
+      "input_sha256": "ecf437dd534144cc7759c1668aaa11e5cecc5d4285045f0337ddb3fa028eb4db",
+      "reused_legacy_core": true,
+      "status": "ok"
+    },
+    {
+      "core_json": "test/golden_core/mmcif/insertion_code/1VVJ/1VVJ.cif.core.json",
+      "error": null,
+      "input": "test/mmcif/insertion_code/1VVJ/1VVJ.cif",
+      "input_sha256": "cbcd59631d09fd5712bc3eda37d85cdad1e3ca5097c711d71956d40f6528d455",
+      "reused_legacy_core": true,
+      "status": "ok"
+    },
+    {
+      "core_json": "test/golden_core/mmcif/insertion_code/4ARC/4ARC.cif.core.json",
+      "error": null,
+      "input": "test/mmcif/insertion_code/4ARC/4ARC.cif",
+      "input_sha256": "251dff9d780e3000412e782a6fc9b2f3bfebd99327727f8b69c8f4d30b80b342",
+      "reused_legacy_core": true,
+      "status": "ok"
+    },
+    {
+      "core_json": "test/golden_science_core/mmcif/nmr_structure/8if5/8if5.cif.core.json",
+      "error": null,
+      "input": "test/mmcif/nmr_structure/8if5/8if5.cif",
+      "input_sha256": "de136375c89e799a6fef366be1066551694ac6679474694fa4d3b5b205d0e66b",
+      "reused_legacy_core": false,
+      "status": "ok"
+    },
+    {
+      "core_json": "test/golden_core/mmcif/other/6pom/6pom.cif.core.json",
+      "error": null,
+      "input": "test/mmcif/other/6pom/6pom.cif",
+      "input_sha256": "d794928fc388c8f2c13a7d87b9ffb8e9664d181f8d1d43dadca533131780fec0",
+      "reused_legacy_core": true,
+      "status": "ok"
+    },
+    {
+      "core_json": "test/golden_core/mmcif/x-ray/3P4J/assembly-1/3P4J-ASSEMBLY1.CIF.core.json",
+      "error": null,
+      "input": "test/mmcif/x-ray/3P4J/assembly-1/3p4j-assembly1.cif",
+      "input_sha256": "2047c2e179e323c0fbdc9c6b38aa82d0ad2c98a077a513acb0770217d4cc4ea2",
+      "reused_legacy_core": true,
+      "status": "ok"
+    },
+    {
+      "core_json": "test/golden_core/mmcif/x-ray/434D/assembly-1/434D-ASSEMBLY1.CIF.core.json",
+      "error": null,
+      "input": "test/mmcif/x-ray/434D/assembly-1/434d-assembly1.cif",
+      "input_sha256": "e47ed2a4d30a92bfd8427a8747e6d83c5fe38f8f3524ba44b679aaef8831efdf",
+      "reused_legacy_core": true,
+      "status": "ok"
+    },
+    {
+      "core_json": "test/golden_core/mmcif/x-ray/434D/assembly-2/434d-assembly2.cif.core.json",
+      "error": null,
+      "input": "test/mmcif/x-ray/434D/assembly-2/434d-assembly2.cif",
+      "input_sha256": "1b5176799852c11e5fe06df10648751ea85d2e5d0fef2eca00dfd8aad8f7180b",
+      "reused_legacy_core": true,
+      "status": "ok"
+    },
+    {
+      "core_json": "test/golden_core/mmcif/x-ray/4NMG/assembly-1/4NMG-ASSEMBLY1.CIF.core.json",
+      "error": null,
+      "input": "test/mmcif/x-ray/4NMG/assembly-1/4nmg-assembly1.cif",
+      "input_sha256": "85a8128b7376f61e947024939866a2f3681408f924aa5b24570c7c50cce3b26b",
+      "reused_legacy_core": true,
+      "status": "ok"
+    },
+    {
+      "core_json": "test/golden_core/pdb/pdb1nvy/pdb1nvy.ent.core.json",
+      "error": null,
+      "input": "test/pdb/pdb1nvy/pdb1nvy.ent",
+      "input_sha256": "3d53e3167aa61bd3ab6e507c5de442f166f1abf469b8a3f167c940ad7bb97284",
+      "reused_legacy_core": true,
+      "status": "ok"
+    },
+    {
+      "core_json": "test/golden_core/pdb/pdb1nvy/pdb1nvy.pdb.core.json",
+      "error": null,
+      "input": "test/pdb/pdb1nvy/pdb1nvy.pdb",
+      "input_sha256": "3d53e3167aa61bd3ab6e507c5de442f166f1abf469b8a3f167c940ad7bb97284",
+      "reused_legacy_core": true,
+      "status": "ok"
+    },
+    {
+      "core_json": "test/golden_core/pdb/test1/test1.pdb.core.json",
+      "error": null,
+      "input": "test/pdb/test1/test1.pdb",
+      "input_sha256": "8ea4577858af1c14f4a4ae0cd67849833407cd05698e68d166c0d48fa8325184",
+      "reused_legacy_core": true,
+      "status": "ok"
+    },
+    {
+      "core_json": "test/golden_core/pdb/tr0001/tr0001.pdb.core.json",
+      "error": null,
+      "input": "test/pdb/tr0001/tr0001.pdb",
+      "input_sha256": "1f68983f9102efc80fb6ea4ee869e1a705eafa2c854af5076073408bf85f1c1d",
+      "reused_legacy_core": true,
+      "status": "ok"
+    },
+    {
+      "core_json": "test/golden_core/pdb/url064/url064.pdb.core.json",
+      "error": null,
+      "input": "test/pdb/url064/url064.pdb",
+      "input_sha256": "169b6bd1a5a634707dbef30206e448b7068ecc5c296f810c0532d6c4e06d954b",
+      "reused_legacy_core": true,
+      "status": "ok"
+    },
+    {
+      "core_json": "test/golden_core/pdb/urx053/urx053.pdb.core.json",
+      "error": null,
+      "input": "test/pdb/urx053/urx053.pdb",
+      "input_sha256": "29a19d7eac803e81cbf9226145b7db31e6669733efd0529493d3976d9f8c7b50",
+      "reused_legacy_core": true,
+      "status": "ok"
+    }
+  ],
+  "notes": {
+    "core_json may point to test/golden_core when identical": true,
+    "write_all": false
+  },
+  "schema_version": 1,
+  "semantics": "science-v1"
+}

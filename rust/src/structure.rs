@@ -1,5 +1,5 @@
 use pdbtbx::{
-    ContainsAtomConformer, ContainsAtomConformerResidue, ContainsAtomConformerResidueChain,
+    ContainsAtomConformer, ContainsAtomConformerResidue, ContainsAtomConformerResidueChain, Element,
     Format, ReadOptions, StrictnessLevel,
 };
 use crate::semantics::{ChainIdPolicy, HydrogenPolicy, MissingInsertionCodePolicy, StructurePolicies};
@@ -70,6 +70,28 @@ fn legacy_mmcif_should_discard_h_atom(raw: &str) -> bool {
     ch.to_ascii_uppercase() == 'H'
 }
 
+fn is_hydrogen_atom(raw_name: &str, element: Option<&str>) -> bool {
+    if let Some(sym) = element.map(str::trim) {
+        if sym.eq_ignore_ascii_case("H") || sym.eq_ignore_ascii_case("D") {
+            return true;
+        }
+    }
+
+    let s = raw_name.trim();
+    if s.is_empty() {
+        return false;
+    }
+    let mut it = s.chars();
+    while let Some(ch) = it.next() {
+        if ch.is_ascii_digit() {
+            continue;
+        }
+        let u = ch.to_ascii_uppercase();
+        return u == 'H' || u == 'D';
+    }
+    false
+}
+
 fn normalize_insertion_code(
     is_mmcif: bool,
     insertion_code: Option<char>,
@@ -114,7 +136,13 @@ fn build_chain_id_map<'a>(
             Ok(out)
         }
         ChainIdPolicy::Unique1Char => {
-            const POOL: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+            // `.out` has a 1-char chain field; for science-v1 we still need to avoid collisions.
+            // Expand the pool beyond alnum so large mmCIF structures (many distinct chain IDs)
+            // can still run deterministically.
+            //
+            // Intentionally excludes `,` and `:` since those are structural separators in `.out`.
+            const POOL: &[u8] =
+                b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#$%&()*+-./;<=>?@[]^_{|}~";
 
             let mut out: HashMap<String, char> = HashMap::new();
             let mut used: std::collections::HashSet<char> = std::collections::HashSet::new();
@@ -312,6 +340,12 @@ pub(crate) fn parse_structure_nucleic_residues_with_policies(
 
     let mut groups: HashMap<ResidueKey, BTreeMap<usize, AtomRec>> = HashMap::new();
     for h in pdb.atoms_with_hierarchy() {
+        let atom = h.atom();
+        if structure_policies.hydrogen_policy == HydrogenPolicy::DiscardAll
+            && is_hydrogen_atom(atom.name(), atom.element().map(Element::symbol))
+        {
+            continue;
+        }
         let chain_id = h.chain().id().to_string();
         let resseq = i32::try_from(h.residue().serial_number()).unwrap_or(9999);
         let insertion_code = normalize_insertion_code(
@@ -332,20 +366,20 @@ pub(crate) fn parse_structure_nucleic_residues_with_policies(
             insertion_code,
             resname,
         };
-        let serial = h.atom().serial_number();
-        if apply_legacy_mmcif_h_bug_filter && legacy_mmcif_should_discard_h_atom(h.atom().name()) {
+        let serial = atom.serial_number();
+        if apply_legacy_mmcif_h_bug_filter && legacy_mmcif_should_discard_h_atom(atom.name()) {
             continue;
         }
-        let name = canonical_atom_name(h.atom().name());
+        let name = canonical_atom_name(atom.name());
         let atoms = groups.entry(key).or_insert_with(BTreeMap::new);
         if atoms.values().any(|a| a.name == name) {
             continue;
         }
         atoms.entry(serial).or_insert_with(|| AtomRec {
             name,
-            x: h.atom().x(),
-            y: h.atom().y(),
-            z: h.atom().z(),
+            x: atom.x(),
+            y: atom.y(),
+            z: atom.z(),
         });
     }
 
@@ -453,18 +487,26 @@ pub(crate) fn parse_structure_nucleic_residues_with_policies(
             ))
     });
 
-    let chain_map = build_chain_id_map(
-        entries.iter().map(|(_min_serial, key, _atoms)| key.chain_id.as_str()),
-        structure_policies.chain_id_policy,
-    )?;
-
-    let mut out: Vec<BaseResidue> = Vec::new();
+    // Chain mapping only needs to consider residues that actually participate in base indexing
+    // (i.e., nucleic residues). Including protein chains can exceed the 1-char pool under
+    // `unique-1char` for large complexes (e.g. ribosomes).
+    let mut nucleic: Vec<(ResidueKey, char)> = Vec::new();
     for (_min_serial, key, atoms) in entries {
         let ry = residue_ident(&atoms);
         if ry < 0 {
             continue;
         }
         let base = base_from_resname_or_infer(&key.resname, ry, &atoms);
+        nucleic.push((key, base));
+    }
+
+    let chain_map = build_chain_id_map(
+        nucleic.iter().map(|(key, _base)| key.chain_id.as_str()),
+        structure_policies.chain_id_policy,
+    )?;
+
+    let mut out: Vec<BaseResidue> = Vec::new();
+    for (key, base) in nucleic {
         let chain = chain_map.get(key.chain_id.as_str()).copied().unwrap_or(' ');
         out.push(BaseResidue {
             chain,
@@ -532,6 +574,12 @@ pub(crate) fn parse_structure_nucleic_residues_with_atoms_with_policies(
 
     let mut groups: HashMap<ResidueKey, BTreeMap<usize, AtomRec>> = HashMap::new();
     for h in pdb.atoms_with_hierarchy() {
+        let atom = h.atom();
+        if structure_policies.hydrogen_policy == HydrogenPolicy::DiscardAll
+            && is_hydrogen_atom(atom.name(), atom.element().map(Element::symbol))
+        {
+            continue;
+        }
         let chain_id = h.chain().id().to_string();
         let resseq = i32::try_from(h.residue().serial_number()).unwrap_or(9999);
         let insertion_code = normalize_insertion_code(
@@ -552,20 +600,20 @@ pub(crate) fn parse_structure_nucleic_residues_with_atoms_with_policies(
             insertion_code,
             resname,
         };
-        let serial = h.atom().serial_number();
-        if apply_legacy_mmcif_h_bug_filter && legacy_mmcif_should_discard_h_atom(h.atom().name()) {
+        let serial = atom.serial_number();
+        if apply_legacy_mmcif_h_bug_filter && legacy_mmcif_should_discard_h_atom(atom.name()) {
             continue;
         }
-        let name = canonical_atom_name(h.atom().name());
+        let name = canonical_atom_name(atom.name());
         let atoms = groups.entry(key).or_insert_with(BTreeMap::new);
         if atoms.values().any(|a| a.name == name) {
             continue;
         }
         atoms.entry(serial).or_insert_with(|| AtomRec {
             name,
-            x: h.atom().x(),
-            y: h.atom().y(),
-            z: h.atom().z(),
+            x: atom.x(),
+            y: atom.y(),
+            z: atom.z(),
         });
     }
 
@@ -673,18 +721,26 @@ pub(crate) fn parse_structure_nucleic_residues_with_atoms_with_policies(
             ))
     });
 
-    let chain_map = build_chain_id_map(
-        entries.iter().map(|(_min_serial, key, _atoms)| key.chain_id.as_str()),
-        structure_policies.chain_id_policy,
-    )?;
-
-    let mut out: Vec<ResidueAtoms> = Vec::new();
+    // Chain mapping only needs to consider residues that actually participate in base indexing
+    // (i.e., nucleic residues). Including protein chains can exceed the 1-char pool under
+    // `unique-1char` for large complexes (e.g. ribosomes).
+    let mut nucleic: Vec<(ResidueKey, Vec<AtomRec>, i32, char)> = Vec::new();
     for (_min_serial, key, atoms) in entries {
         let ry = residue_ident(&atoms);
         if ry < 0 {
             continue;
         }
         let base = base_from_resname_or_infer(&key.resname, ry, &atoms);
+        nucleic.push((key, atoms, ry, base));
+    }
+
+    let chain_map = build_chain_id_map(
+        nucleic.iter().map(|(key, _atoms, _ry, _base)| key.chain_id.as_str()),
+        structure_policies.chain_id_policy,
+    )?;
+
+    let mut out: Vec<ResidueAtoms> = Vec::new();
+    for (key, atoms, ry, base) in nucleic {
         let chain = chain_map.get(key.chain_id.as_str()).copied().unwrap_or(' ');
         out.push(ResidueAtoms {
             chain,
@@ -745,4 +801,87 @@ pub(crate) fn parse_structure_bases_with_atoms_with_policies(
     }
 
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn legacy_mmcif_h_bug_filter_is_bug_compatible() {
+        assert!(legacy_mmcif_should_discard_h_atom("H1"));
+        assert!(legacy_mmcif_should_discard_h_atom(" H2 "));
+        assert!(!legacy_mmcif_should_discard_h_atom("H5''"));
+        assert!(!legacy_mmcif_should_discard_h_atom("1H2"));
+    }
+
+    #[test]
+    fn hydrogen_detection_uses_element_or_name() {
+        assert!(is_hydrogen_atom("H5''", None));
+        assert!(is_hydrogen_atom("1H2", None));
+        assert!(is_hydrogen_atom("D1", None));
+        assert!(is_hydrogen_atom("CA", Some("H")));
+        assert!(is_hydrogen_atom("CA", Some("D")));
+        assert!(!is_hydrogen_atom("CA", Some("C")));
+        assert!(!is_hydrogen_atom("CA", None));
+    }
+
+    #[test]
+    fn insertion_code_normalization_matches_policies() {
+        assert_eq!(
+            normalize_insertion_code(true, None, MissingInsertionCodePolicy::LegacyQuestionMark),
+            Some('?')
+        );
+        assert_eq!(
+            normalize_insertion_code(true, Some('.'), MissingInsertionCodePolicy::LegacyQuestionMark),
+            Some('?')
+        );
+        assert_eq!(
+            normalize_insertion_code(true, Some('A'), MissingInsertionCodePolicy::LegacyQuestionMark),
+            Some('A')
+        );
+
+        assert_eq!(
+            normalize_insertion_code(true, None, MissingInsertionCodePolicy::None),
+            None
+        );
+        assert_eq!(
+            normalize_insertion_code(true, Some('.'), MissingInsertionCodePolicy::None),
+            None
+        );
+        assert_eq!(
+            normalize_insertion_code(true, Some('?'), MissingInsertionCodePolicy::None),
+            None
+        );
+        assert_eq!(
+            normalize_insertion_code(true, Some('A'), MissingInsertionCodePolicy::None),
+            Some('A')
+        );
+
+        assert_eq!(
+            normalize_insertion_code(false, Some('A'), MissingInsertionCodePolicy::None),
+            Some('A')
+        );
+        assert_eq!(
+            normalize_insertion_code(false, None, MissingInsertionCodePolicy::LegacyQuestionMark),
+            None
+        );
+    }
+
+    #[test]
+    fn chain_id_mapping_unique_1char_is_deterministic_and_collision_free() {
+        let ids = ["AB", "AA", "A", "B"];
+
+        let legacy = build_chain_id_map(ids.iter().copied(), ChainIdPolicy::Legacy1Char).expect("legacy map");
+        assert_eq!(legacy.get("AA").copied(), Some('A'));
+        assert_eq!(legacy.get("AB").copied(), Some('A'));
+
+        let unique = build_chain_id_map(ids.iter().copied(), ChainIdPolicy::Unique1Char).expect("unique map");
+        let aa = unique.get("AA").copied().unwrap_or('?');
+        let ab = unique.get("AB").copied().unwrap_or('?');
+        assert_ne!(aa, ab, "unique mapping must avoid collisions");
+
+        let unique2 = build_chain_id_map(ids.iter().copied(), ChainIdPolicy::Unique1Char).expect("unique map 2");
+        assert_eq!(unique, unique2, "unique mapping must be deterministic");
+    }
 }

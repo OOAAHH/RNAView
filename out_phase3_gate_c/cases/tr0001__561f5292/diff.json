@@ -1,0 +1,73 @@
+{
+  "allowlist": {
+    "unapproved_ids": []
+  },
+  "baseline": {
+    "elapsed_ms": 154,
+    "log": "out_phase3_gate_c/cases/tr0001__561f5292/legacy-v1/rust.log",
+    "options": {
+      "engine": "rust",
+      "oracle": "compute",
+      "policies": {
+        "structure": {
+          "chain_id_policy": "legacy-1char",
+          "hydrogen_policy": "legacy-mmcif-bug",
+          "missing_insertion_code_policy": "legacy-question-mark"
+        }
+      },
+      "semantics": "legacy-v1"
+    },
+    "out_path": "out_phase3_gate_c/cases/tr0001__561f5292/legacy-v1/engine.out",
+    "pairs_json": "out_phase3_gate_c/cases/tr0001__561f5292/legacy-v1/pairs.json"
+  },
+  "candidate": {
+    "elapsed_ms": 147,
+    "log": "out_phase3_gate_c/cases/tr0001__561f5292/science-v1/rust.log",
+    "options": {
+      "engine": "rust",
+      "oracle": "compute",
+      "policies": {
+        "structure": {
+          "chain_id_policy": "legacy-1char",
+          "hydrogen_policy": "discard-all",
+          "missing_insertion_code_policy": "legacy-question-mark"
+        }
+      },
+      "semantics": "science-v1"
+    },
+    "out_path": "out_phase3_gate_c/cases/tr0001__561f5292/science-v1/engine.out",
+    "pairs_json": "out_phase3_gate_c/cases/tr0001__561f5292/science-v1/pairs.json"
+  },
+  "diff": {
+    "base_pairs": {
+      "added": [],
+      "changed": [],
+      "removed": []
+    },
+    "counts": {
+      "base_pairs_added": 0,
+      "base_pairs_changed": 0,
+      "base_pairs_removed": 0,
+      "events": 0,
+      "multiplets_added": 0,
+      "multiplets_removed": 0,
+      "stats_changed": 0
+    },
+    "events": [],
+    "multiplets": {
+      "added": [],
+      "removed": []
+    },
+    "schema_version": 1,
+    "stats_delta": {}
+  },
+  "input": "test/pdb/tr0001/tr0001.pdb",
+  "input_sha256": "1f68983f9102efc80fb6ea4ee869e1a705eafa2c854af5076073408bf85f1c1d",
+  "job_id": "tr0001__561f5292",
+  "schema_version": 1,
+  "semantics": {
+    "baseline": "legacy-v1",
+    "candidate": "science-v1"
+  },
+  "status": "ok"
+}

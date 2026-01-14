@@ -1,0 +1,73 @@
+{
+  "allowlist": {
+    "unapproved_ids": []
+  },
+  "baseline": {
+    "elapsed_ms": 116,
+    "log": "out_phase3_gate_c/cases/434d-assembly2__8a1cb1b7/legacy-v1/rust.log",
+    "options": {
+      "engine": "rust",
+      "oracle": "compute",
+      "policies": {
+        "structure": {
+          "chain_id_policy": "legacy-1char",
+          "hydrogen_policy": "legacy-mmcif-bug",
+          "missing_insertion_code_policy": "legacy-question-mark"
+        }
+      },
+      "semantics": "legacy-v1"
+    },
+    "out_path": "out_phase3_gate_c/cases/434d-assembly2__8a1cb1b7/legacy-v1/engine.out",
+    "pairs_json": "out_phase3_gate_c/cases/434d-assembly2__8a1cb1b7/legacy-v1/pairs.json"
+  },
+  "candidate": {
+    "elapsed_ms": 122,
+    "log": "out_phase3_gate_c/cases/434d-assembly2__8a1cb1b7/science-v1/rust.log",
+    "options": {
+      "engine": "rust",
+      "oracle": "compute",
+      "policies": {
+        "structure": {
+          "chain_id_policy": "legacy-1char",
+          "hydrogen_policy": "discard-all",
+          "missing_insertion_code_policy": "legacy-question-mark"
+        }
+      },
+      "semantics": "science-v1"
+    },
+    "out_path": "out_phase3_gate_c/cases/434d-assembly2__8a1cb1b7/science-v1/engine.out",
+    "pairs_json": "out_phase3_gate_c/cases/434d-assembly2__8a1cb1b7/science-v1/pairs.json"
+  },
+  "diff": {
+    "base_pairs": {
+      "added": [],
+      "changed": [],
+      "removed": []
+    },
+    "counts": {
+      "base_pairs_added": 0,
+      "base_pairs_changed": 0,
+      "base_pairs_removed": 0,
+      "events": 0,
+      "multiplets_added": 0,
+      "multiplets_removed": 0,
+      "stats_changed": 0
+    },
+    "events": [],
+    "multiplets": {
+      "added": [],
+      "removed": []
+    },
+    "schema_version": 1,
+    "stats_delta": {}
+  },
+  "input": "test/mmcif/x-ray/434D/assembly-2/434d-assembly2.cif",
+  "input_sha256": "1b5176799852c11e5fe06df10648751ea85d2e5d0fef2eca00dfd8aad8f7180b",
+  "job_id": "434d-assembly2__8a1cb1b7",
+  "schema_version": 1,
+  "semantics": {
+    "baseline": "legacy-v1",
+    "candidate": "science-v1"
+  },
+  "status": "ok"
+}

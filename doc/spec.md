@@ -257,19 +257,43 @@ Rust (Hot Core Engine)
 
 - `structure.hydrogen_policy`
   - `legacy-mmcif-bug`：复刻 legacy mmCIF 去氢 bug（保留部分 4 字符 H 原子名），用于 `legacy-v1` 的 byte-exact 回归。
-  - `discard-all`：彻底去氢（科学模式默认）。
+  - `discard-all`：彻底去氢（`science-v1` 默认）。
   - `keep-all`：保留所有氢（用于研究“氢坐标对分类的影响”，不保证与 legacy 一致）。
 - `structure.missing_insertion_code_policy`
   - `legacy-question-mark`：复刻 legacy：mmCIF 缺失/`.` 的 insertion code 被映射为 `?`。
-  - `none`：科学模式：mmCIF 缺失/`.`/`?` 的 insertion code 视为缺失（`None`）。
+  - `none`：科学模式（可选覆盖）：mmCIF 缺失/`.`/`?` 的 insertion code 视为缺失（`None`）。
 - `structure.chain_id_policy`
   - `legacy-1char`：复刻 legacy：链 ID 截断为 1 字符（可能产生碰撞）。
-  - `unique-1char`：将不同链 ID 映射到不同的 1 字符（保持 `.out` 格式要求，同时避免碰撞）。
+  - `unique-1char`：科学模式（可选覆盖）：将不同链 ID 映射到不同的 1 字符（保持 `.out` 格式要求，同时避免碰撞）。
+
+preset 默认值（便于回归口径）：
+
+- `legacy-v1`：`legacy-mmcif-bug` + `legacy-question-mark` + `legacy-1char`
+- `science-v1`：`discard-all` + `legacy-question-mark` + `legacy-1char`（先聚焦去氢 bug；其余差异通过显式 policy flag 启用并用 Gate C 管控）
 
 接口约束：
 
 - 这些参数仅对 **`--oracle compute`（纯 Rust 计算）** 生效；对 `legacy/out` oracle 不允许传入（避免误导性的“伪科学配置”）。
 - `legacy-v1` 的 `.out(full)` 必须保持 byte-exact，因此 **不得**在 `.out` 文本中增加任何新字段；追溯信息写入 `pairs.json.options`。
+
+#### 3.3.4 Gate C（science-v1 差异管理）
+
+Gate C 用于把 “science-v1 相对 legacy-v1 的差异” 做可落盘、可审阅、可批准的管理：
+
+- 工具：`python3 tools/rnaview_gate_c.py run ...`（仓库内验收脚本：`bash test_phase3_gate_c.sh`）。
+- allowlist：`test/gate_c_allowlist.yaml`（YAML 兼容的 JSON；存放已批准的 diff event id）。
+- 退出码：仅当 **无 failed 且无 unapproved** 时返回 `0`；允许存在 “changed（已批准差异）”。
+- 输出：`<out_dir>/summary.json`、`<out_dir>/report.md`、`<out_dir>/cases/<job_id>/{legacy-v1,science-v1}/...` 与 `diff.json`（差异详情）。
+
+#### 3.3.5 science-v1 Golden 回归（Phase 3.4）
+
+当 Gate C 的差异已经被解释并批准后，science-v1 需要从“差异解释”进入“稳定回归”：
+
+- 冻结工具：`python3 tools/rnaview_science_golden.py freeze`
+  - 输出：`test/golden_science_core/manifest.json`
+  - 约定：manifest 的 `core_json` 可以指向 `test/golden_core/**.core.json`（当 science 与 legacy 完全一致时），也可以指向 `test/golden_science_core/**.core.json`（当存在已批准差异时）。
+- 回归验收脚本：`bash test_phase3_science.sh`
+  - 对 `--semantics science-v1` 的 core 做回归（不比较 `.out` bytes）。
 
 ### 3.5 批处理（第一阶段）建议的外部接口契约
 

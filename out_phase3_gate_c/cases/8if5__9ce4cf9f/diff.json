@@ -1,0 +1,282 @@
+{
+  "allowlist": {
+    "unapproved_ids": []
+  },
+  "baseline": {
+    "elapsed_ms": 255,
+    "log": "out_phase3_gate_c/cases/8if5__9ce4cf9f/legacy-v1/rust.log",
+    "options": {
+      "engine": "rust",
+      "oracle": "compute",
+      "policies": {
+        "structure": {
+          "chain_id_policy": "legacy-1char",
+          "hydrogen_policy": "legacy-mmcif-bug",
+          "missing_insertion_code_policy": "legacy-question-mark"
+        }
+      },
+      "semantics": "legacy-v1"
+    },
+    "out_path": "out_phase3_gate_c/cases/8if5__9ce4cf9f/legacy-v1/engine.out",
+    "pairs_json": "out_phase3_gate_c/cases/8if5__9ce4cf9f/legacy-v1/pairs.json"
+  },
+  "candidate": {
+    "elapsed_ms": 252,
+    "log": "out_phase3_gate_c/cases/8if5__9ce4cf9f/science-v1/rust.log",
+    "options": {
+      "engine": "rust",
+      "oracle": "compute",
+      "policies": {
+        "structure": {
+          "chain_id_policy": "legacy-1char",
+          "hydrogen_policy": "discard-all",
+          "missing_insertion_code_policy": "legacy-question-mark"
+        }
+      },
+      "semantics": "science-v1"
+    },
+    "out_path": "out_phase3_gate_c/cases/8if5__9ce4cf9f/science-v1/engine.out",
+    "pairs_json": "out_phase3_gate_c/cases/8if5__9ce4cf9f/science-v1/pairs.json"
+  },
+  "diff": {
+    "base_pairs": {
+      "added": [],
+      "changed": [
+        {
+          "after": {
+            "base_i": "T",
+            "base_j": "T",
+            "chain_i": "A",
+            "chain_j": "A",
+            "i": 7,
+            "j": 8,
+            "kind": "pair",
+            "lw": "S/?",
+            "note": "!(s_s)",
+            "orientation": "cis",
+            "resseq_i": 7,
+            "resseq_j": 8
+          },
+          "before": {
+            "base_i": "T",
+            "base_j": "T",
+            "chain_i": "A",
+            "chain_j": "A",
+            "i": 7,
+            "j": 8,
+            "kind": "pair",
+            "lw": "S/.",
+            "note": "!(s_s)",
+            "orientation": "cis",
+            "resseq_i": 7,
+            "resseq_j": 8
+          },
+          "delta": {
+            "lw": {
+              "after": "S/?",
+              "before": "S/."
+            }
+          },
+          "key": {
+            "i": 7,
+            "j": 8,
+            "kind": "pair"
+          }
+        },
+        {
+          "after": {
+            "base_i": "T",
+            "base_j": "C",
+            "chain_i": "A",
+            "chain_j": "A",
+            "i": 10,
+            "j": 11,
+            "kind": "pair",
+            "lw": "S/H",
+            "note": "!1H(b_b).",
+            "orientation": "cis",
+            "resseq_i": 10,
+            "resseq_j": 11
+          },
+          "before": {
+            "base_i": "T",
+            "base_j": "C",
+            "chain_i": "A",
+            "chain_j": "A",
+            "i": 10,
+            "j": 11,
+            "kind": "pair",
+            "lw": "S/H",
+            "note": "n/a",
+            "orientation": "cis",
+            "resseq_i": 10,
+            "resseq_j": 11
+          },
+          "delta": {
+            "note": {
+              "after": "!1H(b_b).",
+              "before": "n/a"
+            }
+          },
+          "key": {
+            "i": 10,
+            "j": 11,
+            "kind": "pair"
+          }
+        }
+      ],
+      "removed": []
+    },
+    "counts": {
+      "base_pairs_added": 0,
+      "base_pairs_changed": 2,
+      "base_pairs_removed": 0,
+      "events": 6,
+      "multiplets_added": 1,
+      "multiplets_removed": 2,
+      "stats_changed": 1
+    },
+    "events": [
+      {
+        "change": "changed",
+        "delta": {
+          "pair_type_counts": {
+            "HS--cis": {
+              "after": 1,
+              "before": 2
+            }
+          },
+          "total_pairs": {
+            "after": 11,
+            "before": 12
+          }
+        },
+        "id": "test/mmcif/nmr_structure/8if5/8if5.cif|stats|371a9e204f2cdb38",
+        "kind": "stats"
+      },
+      {
+        "change": "changed",
+        "delta": {
+          "lw": {
+            "after": "S/?",
+            "before": "S/."
+          }
+        },
+        "id": "test/mmcif/nmr_structure/8if5/8if5.cif|bp:chg|06a16ecc33df97da",
+        "key": {
+          "i": 7,
+          "j": 8,
+          "kind": "pair"
+        },
+        "kind": "base_pair"
+      },
+      {
+        "change": "changed",
+        "delta": {
+          "note": {
+            "after": "!1H(b_b).",
+            "before": "n/a"
+          }
+        },
+        "id": "test/mmcif/nmr_structure/8if5/8if5.cif|bp:chg|cdd740070a57c4dc",
+        "key": {
+          "i": 10,
+          "j": 11,
+          "kind": "pair"
+        },
+        "kind": "base_pair"
+      },
+      {
+        "change": "added",
+        "id": "test/mmcif/nmr_structure/8if5/8if5.cif|mp:add|6aa7e01c5598fa88",
+        "kind": "multiplet",
+        "record": {
+          "indices": [
+            12,
+            13,
+            17
+          ],
+          "text": "[2 3] A: 12 T + A: 13 C + A: 17 G"
+        }
+      },
+      {
+        "change": "removed",
+        "id": "test/mmcif/nmr_structure/8if5/8if5.cif|mp:rm|b367acd6d2135e98",
+        "kind": "multiplet",
+        "record": {
+          "indices": [
+            10,
+            11,
+            19
+          ],
+          "text": "[2 3] A: 10 T + A: 11 C + A: 19 G"
+        }
+      },
+      {
+        "change": "removed",
+        "id": "test/mmcif/nmr_structure/8if5/8if5.cif|mp:rm|6ff22e7412d0355e",
+        "kind": "multiplet",
+        "record": {
+          "indices": [
+            12,
+            13,
+            17
+          ],
+          "text": "[3 3] A: 12 T + A: 13 C + A: 17 G"
+        }
+      }
+    ],
+    "multiplets": {
+      "added": [
+        {
+          "indices": [
+            12,
+            13,
+            17
+          ],
+          "text": "[2 3] A: 12 T + A: 13 C + A: 17 G"
+        }
+      ],
+      "removed": [
+        {
+          "indices": [
+            10,
+            11,
+            19
+          ],
+          "text": "[2 3] A: 10 T + A: 11 C + A: 19 G"
+        },
+        {
+          "indices": [
+            12,
+            13,
+            17
+          ],
+          "text": "[3 3] A: 12 T + A: 13 C + A: 17 G"
+        }
+      ]
+    },
+    "schema_version": 1,
+    "stats_delta": {
+      "pair_type_counts": {
+        "HS--cis": {
+          "after": 1,
+          "before": 2
+        }
+      },
+      "total_pairs": {
+        "after": 11,
+        "before": 12
+      }
+    }
+  },
+  "input": "test/mmcif/nmr_structure/8if5/8if5.cif",
+  "input_sha256": "de136375c89e799a6fef366be1066551694ac6679474694fa4d3b5b205d0e66b",
+  "job_id": "8if5__9ce4cf9f",
+  "schema_version": 1,
+  "semantics": {
+    "baseline": "legacy-v1",
+    "candidate": "science-v1"
+  },
+  "status": "ok"
+}

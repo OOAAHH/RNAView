@@ -228,7 +228,8 @@ legacy-v1：现有 Gate B 行为（包含 mmCIF 去氢 bug 兼容、链 ID 截�
 science-v1：新“科学模式”（修复去氢 bug 等）。
 可选：把关键可变点拆成可组合 policy（也可先不开放给用户，只在 science-v1 内固定）：
 --hydrogen-policy discard-all|keep-all|legacy-mmcif-bug
---chain-id-policy legacy-1char|full（呼应 spec.md (line 138)、spec.md (line 275)）
+--missing-insertion-code legacy-question-mark|none
+--chain-id-policy legacy-1char|unique-1char
 --mmcif-id-scheme auth|label
 --nmr-model-policy legacy|first|representative
 落盘与可追溯
@@ -244,7 +245,8 @@ legacy-v1（基线，用于对照与解释变化）
 science-v1（新语义）
 产出“差异报告”，并用 allowlist（批准清单）控制哪些差异是“已接受的科学修复”。
 Gate C 输出目录与格式（建议）
-脚本：rnaview_gate_c.py（新）
+脚本：`tools/rnaview_gate_c.py`（已实现；默认读取 `test/gate_c_allowlist.yaml`）
+快捷验收脚本：`bash test_phase3_gate_c.sh`
 输出：
 summary.json（Gate C 自己的 schema）
 report.md（人读）
@@ -269,40 +271,68 @@ multiplets_delta: added/removed（必要时再细分）
 diff.json（给机器审核/allowlist）
 report.md（给人审阅：按“变化最大 case”“变化类型分布”“最常变化的 pair 类型”汇总）
 allowlist 机制（让 Gate C 可 CI 化）
-文件：gate_c_allowlist.yaml（新）
+文件：`test/gate_c_allowlist.yaml`（已实现；内容为“YAML 兼容的 JSON”，避免引入 PyYAML 依赖）
 规则：Gate C 只有在“所有 diff 都在 allowlist”时才通过；否则标记 unapproved 并失败。
 allowlist 条目建议以稳定 key 描述：input + (i,j,kind) + field deltas，并附 reason/issue_id.
 M3.2 “去氢 bug”在 science-v1 中的修复（你关心的核心）
 目标
 science-v1：mmCIF/PDB 均执行“正确且一致”的去氢策略（通常是 discard-all hydrogens，优先用元素字段判断）。
 legacy-v1：保持现状（继续复刻 legacy bug，用于 byte‑exact）。
+备注：当前 `science-v1` preset 默认只改变 `hydrogen_policy=discard-all`，其余结构解析 policy 仍保持 legacy-v1 默认值；如需额外“科学修复”，通过显式 policy flag 覆盖并用 Gate C 管控差异。
 验收
 Gate B 继续全绿（legacy-v1）。
 Gate C 中预期只出现“与去氢相关的差异”，并全部进入 allowlist；后续任何新差异都必须解释/批准。
 M3.3 测试矩阵扩充（把 Phase3 的风险覆盖住）
-围绕 spec.md (line 264) 的 core + 结构解析风险点，建议新增/明确矩阵（每一类至少 1–2 个 fixture）：
+围绕 spec.md (line 264) 的 core + 结构解析风险点，把“回归集”明确成一个矩阵（每一类至少 1–2 个 fixture），并把缺口显式标出：
 
-格式维度：PDB / mmCIF(auth) / mmCIF(label)
-模型维度：X-ray 单模型 / NMR 多模型（含 representative 字段 & 不含）
-编号维度：insertion code（PDB & mmCIF 的 ./? 等异常）
-链维度：单字符 chain / 多字符 label_asym_id（用于决定 chain-id-policy）
-氢维度：无氢 / 有氢且含 4 字符氢名（触发本次 bug）/ 有氢但元素字段缺失
-化学维度：修饰碱基、PSU、I 等
-几何维度：含 tertiary、含 multiplets、含 stacked
+当前回归集（核心输入清单 = `test/golden_core/manifest.json`）：
+
+- 格式维度
+  - PDB：`test/pdb/tr0001/tr0001.pdb`、`test/pdb/test/test.pdb`
+  - mmCIF(auth)：`test/mmcif/x-ray/3P4J/assembly-1/3p4j-assembly1.cif`、`test/mmcif/insertion_code/1EFW/1EFW.cif`
+  - mmCIF(label)：TODO（需要先实现/开放 id_scheme 选择，再补 fixture + Gate）
+- 模型维度
+  - X-ray 单模型：`test/mmcif/x-ray/434D/assembly-1/434d-assembly1.cif`、`test/pdb/pdb1nvy/pdb1nvy.pdb`
+  - NMR 多模型：`test/mmcif/nmr_structure/8if5/8if5.cif`
+  - representative 字段：TODO（需要先实现 model policy；补 1 个“有 rep”+ 1 个“无 rep”的 NMR）
+- 编号维度（insertion code）
+  - mmCIF `.`/缺失/`?`/带字母：`test/mmcif/insertion_code/1EFW/1EFW.cif`、`test/mmcif/insertion_code/4ARC/4ARC.cif`
+  - PDB insertion code：TODO（补一个含 icode 的 PDB fixture；并加入 manifest + Gate B）
+- 链维度
+  - 单字符 chain：大部分 PDB fixture（如 `test/pdb/urx053/urx053.pdb`）
+  - 多链/大复合体（压力）：`test/mmcif/insertion_code/1VVJ/1VVJ.cif`
+  - 多字符 label_asym_id + chain-id-policy：TODO（补一个“前缀冲突”的 mmCIF（如 AA/AB）来测试 `--chain-id-policy unique-1char`）
+- 氢维度
+  - 触发 legacy mmCIF 去氢 bug（4 字符氢名）：`test/mmcif/nmr_structure/8if5/8if5.cif`（Gate C 的 allowlist 当前只批准这类差异）
+  - 元素字段缺失（name fallback）：通过 Rust 单元测试覆盖（见 `rust/src/structure.rs` tests）
+- 化学维度（修饰碱基、PSU、I 等）
+  - 修饰碱基较多：`test/pdb/tr0001/tr0001.pdb`、`test/mmcif/insertion_code/1EFW/1EFW.cif`
+- 几何维度（tertiary / multiplets / stacked）
+  - stacked：`test/pdb/test/test.pdb`、`test/pdb/urx053/urx053.pdb`
+  - multiplets：`test/mmcif/insertion_code/1VVJ/1VVJ.cif`、`test/pdb/urx053/urx053.pdb`
+  - tertiary：TODO（若需要显式覆盖，先定义“tertiary”的可检测信号/字段，再选 fixture）
+
+验收脚本建议（把矩阵落到 Gate 上）：
+
+- legacy-v1：继续走 `.out` byte‑exact（Gate B：`bash test_phase2_noc.sh`）
+- science-v1：走 Gate C（差异报告 + allowlist）：`bash test_phase3_gate_c.sh`（当前跑 `test/pdb` + `test/mmcif`，并强制“除去氢之外无新差异”）
 验收分配
 legacy-v1：继续走 .out byte‑exact（Gate B）
 science-v1：走 Gate C（差异报告 + allowlist），后续稳定后可再冻结 science goldens（见下一条）
 M3.4 冻结 “science-v1” 的 golden（让科学模式也可回归）
 当 Gate C 的差异已经被充分解释并批准后：
-固化一套 science-v1 的 golden（建议先固化 pairs.json core，再决定是否也固化 .out）。
-新增回归脚本：例如 test_phase3_science.sh：跑 science-v1 并对 test/golden_science_core/ 做 compare。
+固化一套 science-v1 的 golden（建议先固化 pairs.json core，再决定是否也固化 .out）：
+- 冻结：`python3 tools/rnaview_science_golden.py freeze`（输出：`test/golden_science_core/manifest.json`）
+  - 默认策略：只为“与 legacy 不同的 case”写入 `test/golden_science_core/**.core.json`，其余 case 直接复用 `test/golden_core/**.core.json`（节省重复数据，也让差异更聚焦）。
+- 回归：`bash test_phase3_science.sh`（跑 `science-v1` 并对 `test/golden_science_core/manifest.json` 做 core 回归）
 这一步完成后，science-v1 也从“解释差异”进入“稳定回归”。
 M3.5 工程化与性能（补齐 python-port.md (line 176) 的内容）
-CI：分层跑
-Gate B（byte‑exact No‑C）
-Gate C（science diff + allowlist）
-bench（只监控性能，不做硬门槛或设阈值报警）
-性能：只在不改变 legacy-v1 结果前提下优化（空间索引、邻域筛选、并行），并用基准锁住收益。
+CI：分层跑（建议拆成独立 job，便于定位失败与并行）
+- Gate B（byte‑exact No‑C）：`bash test_phase2_noc.sh`
+- Gate C（science diff + allowlist）：`bash test_phase3_gate_c.sh`
+- science-v1 回归（frozen goldens）：`bash test_phase3_science.sh`
+- bench（只监控性能，不做硬门槛）：`python3 tools/rnaview_bench.py compare --suite phase2 --runs 3 -o out/bench_phase3.json`
+性能：只在不改变 legacy-v1 结果前提下优化（空间索引、邻域筛选、并行），并用基准锁住收益（只报警，不 hard-fail）。
 Phase 4：渲染与格式现代化（在不动 core 的前提下扩展产物）
 M4.0 输出契约与 API 分层（先定“中间表示”，再定渲染）
 定一个确定性的 2D 中间格式（建议 layout.json），让渲染变成纯函数：

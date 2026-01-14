@@ -109,8 +109,11 @@ impl StructurePolicies {
     pub const fn science_v1_defaults() -> Self {
         Self {
             hydrogen_policy: HydrogenPolicy::DiscardAll,
-            missing_insertion_code_policy: MissingInsertionCodePolicy::None,
-            chain_id_policy: ChainIdPolicy::Unique1Char,
+            // Keep non-hydrogen behaviors aligned with legacy-v1 by default, so Gate C focuses on
+            // scientifically-motivated changes (starting with the mmCIF hydrogen handling bug).
+            // Users can still override via explicit policy flags.
+            missing_insertion_code_policy: MissingInsertionCodePolicy::LegacyQuestionMark,
+            chain_id_policy: ChainIdPolicy::Legacy1Char,
         }
     }
 }
@@ -154,4 +157,3 @@ impl SemanticsConfig {
         }
     }
 }
-

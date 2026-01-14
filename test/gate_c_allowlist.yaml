@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "approved": [
+    {
+      "id": "test/mmcif/nmr_structure/8if5/8if5.cif|stats|371a9e204f2cdb38",
+      "reason": "science-v1 discards hydrogens (fix legacy mmCIF hydrogen bug); stats totals change accordingly"
+    },
+    {
+      "id": "test/mmcif/nmr_structure/8if5/8if5.cif|bp:chg|06a16ecc33df97da",
+      "reason": "science-v1 discards hydrogens (fix legacy mmCIF hydrogen bug); LW code changes"
+    },
+    {
+      "id": "test/mmcif/nmr_structure/8if5/8if5.cif|bp:chg|cdd740070a57c4dc",
+      "reason": "science-v1 discards hydrogens (fix legacy mmCIF hydrogen bug); note field changes"
+    },
+    {
+      "id": "test/mmcif/nmr_structure/8if5/8if5.cif|mp:add|6aa7e01c5598fa88",
+      "reason": "science-v1 discards hydrogens (fix legacy mmCIF hydrogen bug); multiplets differ"
+    },
+    {
+      "id": "test/mmcif/nmr_structure/8if5/8if5.cif|mp:rm|6ff22e7412d0355e",
+      "reason": "science-v1 discards hydrogens (fix legacy mmCIF hydrogen bug); multiplets differ"
+    },
+    {
+      "id": "test/mmcif/nmr_structure/8if5/8if5.cif|mp:rm|b367acd6d2135e98",
+      "reason": "science-v1 discards hydrogens (fix legacy mmCIF hydrogen bug); multiplets differ"
+    }
+  ]
+}
+

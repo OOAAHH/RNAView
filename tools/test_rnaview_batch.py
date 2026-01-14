@@ -54,3 +54,28 @@ class TestBatchRunner(unittest.TestCase):
             job_dir = Path(res["job_dir"])
             self.assertTrue((job_dir / "pairs.json").exists())
             self.assertTrue((job_dir / "legacy.out").exists())
+
+    def test_regress_manifest_supports_explicit_input(self) -> None:
+        inp = self.repo / "test" / "pdb" / "tr0001" / "tr0001.pdb"
+        core_json = self.repo / "test" / "golden_core" / "pdb" / "tr0001" / "tr0001.pdb.core.json"
+
+        manifest = {
+            "schema_version": 1,
+            "entries": [
+                {
+                    "input": "test/pdb/tr0001/tr0001.pdb",
+                    "core_json": "test/golden_core/pdb/tr0001/tr0001.pdb.core.json",
+                }
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as td:
+            mp = Path(td) / "manifest.json"
+            mp.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+            idx = self.batch_mod._build_regress_index(mp)
+            golden = self.batch_mod._lookup_golden_entry(inp.resolve(), idx)
+            self.assertIsNotNone(golden)
+            assert golden is not None
+            self.assertEqual(golden.core_path.resolve(), core_json.resolve())
+            self.assertIsNone(golden.out_path)

@@ -177,7 +177,7 @@ class JobResult:
 
 @dataclass(frozen=True)
 class GoldenEntry:
-    out_path: Path
+    out_path: Path | None
     core_path: Path
 
 
@@ -481,24 +481,9 @@ def _run_one_legacy(
                             elapsed_ms=int((time.time() - started) * 1000),
                         )
             elif regress_mode == "out":
-                golden_bytes = golden.out_path.read_bytes()
-                candidate_bytes = legacy_out_path.read_bytes()
-                if candidate_bytes == golden_bytes:
-                    regress_ok = True
-                else:
+                if golden.out_path is None:
                     regress_ok = False
-                    if _maybe_eol_only_diff(golden_bytes, candidate_bytes):
-                        regress_diffs = ["byte mismatch: line endings differ (CRLF vs LF)"]
-                    else:
-                        golden_text = golden_bytes.decode("utf-8", errors="replace")
-                        candidate_text = candidate_bytes.decode("utf-8", errors="replace")
-                        regress_diffs = _unified_diff(
-                            golden_text,
-                            candidate_text,
-                            fromfile=str(golden.out_path),
-                            tofile=str(legacy_out_path),
-                            max_lines=max_diffs,
-                        )
+                    regress_diffs = ["manifest entry missing golden .out path for --regress-mode out"]
                     if not keep_going:
                         return JobResult(
                             input=str(input_path),
@@ -509,11 +494,45 @@ def _run_one_legacy(
                             pairs_json=str(pairs_path),
                             legacy_out=str(legacy_out_path),
                             out_path=str(legacy_out_path),
-                            error=".out regression mismatch",
+                            error=".out regression missing golden .out",
                             regress_ok=False,
                             regress_diffs=regress_diffs,
                             elapsed_ms=int((time.time() - started) * 1000),
                         )
+                else:
+                    golden_bytes = golden.out_path.read_bytes()
+                    candidate_bytes = legacy_out_path.read_bytes()
+                    if candidate_bytes == golden_bytes:
+                        regress_ok = True
+                    else:
+                        regress_ok = False
+                        if _maybe_eol_only_diff(golden_bytes, candidate_bytes):
+                            regress_diffs = ["byte mismatch: line endings differ (CRLF vs LF)"]
+                        else:
+                            golden_text = golden_bytes.decode("utf-8", errors="replace")
+                            candidate_text = candidate_bytes.decode("utf-8", errors="replace")
+                            regress_diffs = _unified_diff(
+                                golden_text,
+                                candidate_text,
+                                fromfile=str(golden.out_path),
+                                tofile=str(legacy_out_path),
+                                max_lines=max_diffs,
+                            )
+                        if not keep_going:
+                            return JobResult(
+                                input=str(input_path),
+                                job_id=job_id,
+                                engine="legacy",
+                                status="failed",
+                                job_dir=str(job_dir),
+                                pairs_json=str(pairs_path),
+                                legacy_out=str(legacy_out_path),
+                                out_path=str(legacy_out_path),
+                                error=".out regression mismatch",
+                                regress_ok=False,
+                                regress_diffs=regress_diffs,
+                                elapsed_ms=int((time.time() - started) * 1000),
+                            )
             else:
                 raise ValueError(f"unknown regress_mode: {regress_mode}")
 
@@ -720,24 +739,9 @@ def _run_one_rust(
                             elapsed_ms=int((time.time() - started) * 1000),
                         )
             elif regress_mode == "out":
-                golden_bytes = golden.out_path.read_bytes()
-                candidate_bytes = engine_out_path.read_bytes()
-                if candidate_bytes == golden_bytes:
-                    regress_ok = True
-                else:
+                if golden.out_path is None:
                     regress_ok = False
-                    if _maybe_eol_only_diff(golden_bytes, candidate_bytes):
-                        regress_diffs = ["byte mismatch: line endings differ (CRLF vs LF)"]
-                    else:
-                        golden_text = golden_bytes.decode("utf-8", errors="replace")
-                        candidate_text = candidate_bytes.decode("utf-8", errors="replace")
-                        regress_diffs = _unified_diff(
-                            golden_text,
-                            candidate_text,
-                            fromfile=str(golden.out_path),
-                            tofile=str(engine_out_path),
-                            max_lines=max_diffs,
-                        )
+                    regress_diffs = ["manifest entry missing golden .out path for --regress-mode out"]
                     if not keep_going:
                         return JobResult(
                             input=str(input_path),
@@ -747,11 +751,44 @@ def _run_one_rust(
                             job_dir=str(job_dir),
                             pairs_json=str(pairs_path),
                             out_path=str(engine_out_path),
-                            error=".out regression mismatch",
+                            error=".out regression missing golden .out",
                             regress_ok=False,
                             regress_diffs=regress_diffs,
                             elapsed_ms=int((time.time() - started) * 1000),
                         )
+                else:
+                    golden_bytes = golden.out_path.read_bytes()
+                    candidate_bytes = engine_out_path.read_bytes()
+                    if candidate_bytes == golden_bytes:
+                        regress_ok = True
+                    else:
+                        regress_ok = False
+                        if _maybe_eol_only_diff(golden_bytes, candidate_bytes):
+                            regress_diffs = ["byte mismatch: line endings differ (CRLF vs LF)"]
+                        else:
+                            golden_text = golden_bytes.decode("utf-8", errors="replace")
+                            candidate_text = candidate_bytes.decode("utf-8", errors="replace")
+                            regress_diffs = _unified_diff(
+                                golden_text,
+                                candidate_text,
+                                fromfile=str(golden.out_path),
+                                tofile=str(engine_out_path),
+                                max_lines=max_diffs,
+                            )
+                        if not keep_going:
+                            return JobResult(
+                                input=str(input_path),
+                                job_id=job_id,
+                                engine="rust",
+                                status="failed",
+                                job_dir=str(job_dir),
+                                pairs_json=str(pairs_path),
+                                out_path=str(engine_out_path),
+                                error=".out regression mismatch",
+                                regress_ok=False,
+                                regress_diffs=regress_diffs,
+                                elapsed_ms=int((time.time() - started) * 1000),
+                            )
             else:
                 raise ValueError(f"unknown regress_mode: {regress_mode}")
 
@@ -785,16 +822,35 @@ def _build_regress_index(manifest_path: Path) -> RegressIndex:
     by_exact_input: dict[Path, GoldenEntry] = {}
     by_dir: dict[Path, list[tuple[str, GoldenEntry]]] = {}
     for entry in manifest.get("entries", []):
-        out_rel = Path(entry["out"])
-        input_rel = out_rel.with_suffix("")
-        input_path = (repo / input_rel).resolve()
-        out_path = (repo / out_rel).resolve()
-        core_path = (repo / entry["core_json"]).resolve()
+        input_raw = entry.get("input")
+        out_raw = entry.get("out")
+        core_raw = entry.get("core_json")
+        if not core_raw:
+            continue
+
+        if input_raw:
+            input_rel = Path(input_raw)
+            input_path = input_rel.resolve() if input_rel.is_absolute() else (repo / input_rel).resolve()
+        elif out_raw:
+            out_rel = Path(out_raw)
+            input_rel = out_rel.with_suffix("")
+            input_path = (repo / input_rel).resolve()
+        else:
+            continue
+
+        out_path: Path | None = None
+        if out_raw:
+            out_rel = Path(out_raw)
+            out_path = out_rel.resolve() if out_rel.is_absolute() else (repo / out_rel).resolve()
+
+        core_rel = Path(core_raw)
+        core_path = core_rel.resolve() if core_rel.is_absolute() else (repo / core_rel).resolve()
+
         golden = GoldenEntry(out_path=out_path, core_path=core_path)
         by_exact_input[input_path] = golden
 
-        directory = (repo / out_rel).resolve().parent
-        canon = _canon_stem(input_rel.name)
+        directory = input_path.parent.resolve()
+        canon = _canon_stem(input_path.name)
         by_dir.setdefault(directory, []).append((canon, golden))
 
     by_dir_canon: dict[tuple[Path, str], GoldenEntry] = {}
