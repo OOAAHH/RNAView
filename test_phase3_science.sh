@@ -8,9 +8,11 @@ export RNAVIEW="$ROOT_DIR"
 # - No-C: pure Rust core + Python orchestration
 # - core regression against frozen science-v1 golden set
 
-bash "$ROOT_DIR/tools/cargo_sysroot.sh" build --manifest-path "$ROOT_DIR/rust/Cargo.toml"
-bash "$ROOT_DIR/tools/cargo_sysroot.sh" test --manifest-path "$ROOT_DIR/rust/Cargo.toml"
-python3 -m unittest discover -s "$ROOT_DIR/tools" -p "test_*.py"
+if [[ "${SKIP_BUILD:-0}" != "1" ]]; then
+  bash "$ROOT_DIR/tools/cargo_sysroot.sh" build --manifest-path "$ROOT_DIR/rust/Cargo.toml"
+  bash "$ROOT_DIR/tools/cargo_sysroot.sh" test --manifest-path "$ROOT_DIR/rust/Cargo.toml"
+  python3 -m unittest discover -s "$ROOT_DIR/tools" -p "test_*.py"
+fi
 
 echo "== science-v1 engine (No-C: structure -> Rust compute -> core regression) ==" >&2
 OUT_DIR="$(mktemp -d)"
@@ -31,4 +33,3 @@ fi
 
 echo "FAILED: outputs kept at $OUT_DIR" >&2
 exit 1
-

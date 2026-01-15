@@ -7,9 +7,11 @@ export RNAVIEW="$ROOT_DIR"
 # This runs the Rust toolchain + Python orchestration only, and performs
 # byte-exact .out regression against the frozen golden set.
 
-bash "$ROOT_DIR/tools/cargo_sysroot.sh" build --manifest-path "$ROOT_DIR/rust/Cargo.toml"
-bash "$ROOT_DIR/tools/cargo_sysroot.sh" test --manifest-path "$ROOT_DIR/rust/Cargo.toml"
-python3 -m unittest discover -s "$ROOT_DIR/tools" -p "test_*.py"
+if [[ "${SKIP_BUILD:-0}" != "1" ]]; then
+  bash "$ROOT_DIR/tools/cargo_sysroot.sh" build --manifest-path "$ROOT_DIR/rust/Cargo.toml"
+  bash "$ROOT_DIR/tools/cargo_sysroot.sh" test --manifest-path "$ROOT_DIR/rust/Cargo.toml"
+  python3 -m unittest discover -s "$ROOT_DIR/tools" -p "test_*.py"
+fi
 
 echo "== rust engine (No-C: structure -> Rust compute -> .out(full)) ==" >&2
 OUT_DIR="$(mktemp -d)"

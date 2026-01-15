@@ -1,0 +1,57 @@
+{
+  "allowlist": {
+    "approved_count": 6,
+    "path": "test/gate_c_allowlist.yaml",
+    "schema_version": 1
+  },
+  "counts": {
+    "changed": 1,
+    "failed": 0,
+    "ok": 0,
+    "unapproved": 0
+  },
+  "elapsed_ms": 508,
+  "results": [
+    {
+      "baseline": {
+        "elapsed_ms": 248,
+        "error": null,
+        "log": "out_phase3_extra.VB05Zz/gate_c/cases/8if5__9ce4cf9f/legacy-v1/rust.log",
+        "out_path": "out_phase3_extra.VB05Zz/gate_c/cases/8if5__9ce4cf9f/legacy-v1/engine.out",
+        "pairs_json": "out_phase3_extra.VB05Zz/gate_c/cases/8if5__9ce4cf9f/legacy-v1/pairs.json",
+        "semantics": "legacy-v1",
+        "status": "ok"
+      },
+      "candidate": {
+        "elapsed_ms": 246,
+        "error": null,
+        "log": "out_phase3_extra.VB05Zz/gate_c/cases/8if5__9ce4cf9f/science-v1/rust.log",
+        "out_path": "out_phase3_extra.VB05Zz/gate_c/cases/8if5__9ce4cf9f/science-v1/engine.out",
+        "pairs_json": "out_phase3_extra.VB05Zz/gate_c/cases/8if5__9ce4cf9f/science-v1/pairs.json",
+        "semantics": "science-v1",
+        "status": "ok"
+      },
+      "case_dir": "out_phase3_extra.VB05Zz/gate_c/cases/8if5__9ce4cf9f",
+      "diff_counts": {
+        "base_pairs_added": 0,
+        "base_pairs_changed": 2,
+        "base_pairs_removed": 0,
+        "events": 6,
+        "multiplets_added": 1,
+        "multiplets_removed": 2,
+        "stats_changed": 1
+      },
+      "diff_json": "out_phase3_extra.VB05Zz/gate_c/cases/8if5__9ce4cf9f/diff.json",
+      "input": "test/mmcif/nmr_structure/8if5/8if5.cif",
+      "input_sha256": "de136375c89e799a6fef366be1066551694ac6679474694fa4d3b5b205d0e66b",
+      "job_id": "8if5__9ce4cf9f",
+      "status": "changed",
+      "unapproved_ids": []
+    }
+  ],
+  "schema_version": 1,
+  "semantics": {
+    "baseline": "legacy-v1",
+    "candidate": "science-v1"
+  }
+}

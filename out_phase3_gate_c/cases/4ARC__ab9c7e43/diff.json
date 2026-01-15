@@ -3,7 +3,7 @@
     "unapproved_ids": []
   },
   "baseline": {
-    "elapsed_ms": 399,
+    "elapsed_ms": 382,
     "log": "out_phase3_gate_c/cases/4ARC__ab9c7e43/legacy-v1/rust.log",
     "options": {
       "engine": "rust",
@@ -21,7 +21,7 @@
     "pairs_json": "out_phase3_gate_c/cases/4ARC__ab9c7e43/legacy-v1/pairs.json"
   },
   "candidate": {
-    "elapsed_ms": 403,
+    "elapsed_ms": 373,
     "log": "out_phase3_gate_c/cases/4ARC__ab9c7e43/science-v1/rust.log",
     "options": {
       "engine": "rust",

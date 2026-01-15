@@ -1,0 +1,26 @@
+{
+  "counts": {
+    "failed": 0,
+    "ok": 1,
+    "regress_failed": 0,
+    "skipped": 0
+  },
+  "elapsed_ms": 253,
+  "results": [
+    {
+      "elapsed_ms": 248,
+      "engine": "rust",
+      "error": null,
+      "input": "/workspaces/RNAView/test/mmcif/nmr_structure/8if5/8if5.cif",
+      "job_dir": "/workspaces/RNAView/out_phase3_extra.VB05Zz/science-v1/8if5__9ce4cf9f",
+      "job_id": "8if5__9ce4cf9f",
+      "legacy_out": null,
+      "out_path": "/workspaces/RNAView/out_phase3_extra.VB05Zz/science-v1/8if5__9ce4cf9f/engine.out",
+      "pairs_json": "/workspaces/RNAView/out_phase3_extra.VB05Zz/science-v1/8if5__9ce4cf9f/pairs.json",
+      "regress_diffs": null,
+      "regress_ok": null,
+      "status": "ok"
+    }
+  ],
+  "schema_version": 1
+}

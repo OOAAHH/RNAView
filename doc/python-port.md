@@ -329,6 +329,7 @@ M3.4 冻结 “science-v1” 的 golden（让科学模式也可回归）
 M3.5 工程化与性能（补齐 python-port.md (line 176) 的内容）
 CI：分层跑（建议拆成独立 job，便于定位失败与并行）
 - GitHub Actions 示例：`.github/workflows/ci.yml`（Gate B/C/science）+ `.github/workflows/bench.yml`（bench，scheduled/dispatch）
+- Phase 3 收尾一键脚本：`bash test_phase3_wrapup.sh`（可附加任意 `.pdb/.cif` 输入并生成 Gate C 报告）
 - Gate B（byte‑exact No‑C）：`bash test_phase2_noc.sh`
 - Gate C（science diff + allowlist）：`bash test_phase3_gate_c.sh`
 - science-v1 回归（frozen goldens）：`bash test_phase3_science.sh`
