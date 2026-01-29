@@ -1,0 +1,34 @@
+
+JOB finished! Time used: 0.02 seconds
+Processing a single file ...
+
+PDB data file name: pdb1nvy.pdb_new
+
+########################################################RNA/DNA chain_ID:  A  from residue    1 to   10
+RNA/DNA chain_ID:  B  from residue    1 to   10
+
+The backbone torsion angles are in pdb1nvy.pdb_new_torsion.out
+
+Finding all the base pairs...
+pair-type    1    1   20 --c
+pair-type    2    2   19 ++c
+pair-type    3    3   18 ++c
+pair-type    4    4   17 ++c
+pair-type    5    5   16 --c
+pair-type    6    6   15 --c
+  The total base pairs =   6 (from   20 bases);
+No pattern found!
+  Number of Helix =   1; The longest is number  1
+
+Ploting 2D structure...
+Input file is (pdb1nvy.pdb.xml) with number of chains (2)
+helix_width =    178.38
+Number of base pairs (including tertiary interactions):   7
+Number of helix (anti-parallel):   1
+Number of single strand:   2
+
+2D structure (PS) finished! see output file: pdb1nvy.pdb.ps
+
+3D structure (VRML) finished! see output file: pdb1nvy.pdb_new.wrl
+
+Time used: 0.02 seconds

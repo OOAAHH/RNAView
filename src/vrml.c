@@ -40,7 +40,7 @@ void process_3d_fig(char *pdbfile, long num_residue, char *bseq, long **seidx,
     vrml_outfile = fopen(outfile, "w");
 
     C4xyz = dmatrix(1, num_residue + 10, 1, 4);
-    resnam = cmatrix(1, num_residue + 1, 1, 4);
+    resnam = cmatrix(1, num_residue + 1, 0, 3);
     chain_idx = lmatrix(1, 40, 1, 2); /* # of chains max = 100 */
 
     chain_idx[1][1] = 1;
@@ -114,7 +114,7 @@ void process_3d_fig(char *pdbfile, long num_residue, char *bseq, long **seidx,
     fclose(vrml_outfile);
 
     free_dmatrix(C4xyz, 1, num_residue + 10, 1, 4);
-    free_cmatrix(resnam, 1, num_residue + 1, 1, 4);
+    free_cmatrix(resnam, 1, num_residue + 1, 0, 3);
     free_lmatrix(chain_idx, 1, 40, 1, 2); /* # of chains max = 100 */
     printf("\n3D structure (VRML) finished! see output file: %s\n", outfile);
 }
@@ -736,12 +736,19 @@ static void vrml_i(const int i)
 static void vrml_header(void)
 {
     char user_str[81];
+    const char *user_env;
     time_t run_time;
 
     fprintf(vrml_outfile, "#VRML V2.0 utf8\n");
     run_time = time(NULL);
     fprintf(vrml_outfile, "# Creation Date: %s", ctime(&run_time));
-    strncpy(user_str, getenv("USER"), 80);
+    user_env = getenv("USER");
+    if (user_env == NULL || user_env[0] == '\0')
+        user_env = getenv("LOGNAME");
+    if (user_env == NULL || user_env[0] == '\0')
+        user_env = "unknown";
+    strncpy(user_str, user_env, 80);
+    user_str[80] = '\0';
     fprintf(vrml_outfile, "# UserName: %s\n\n", user_str);
 
     needs_delimiter = 1;

@@ -1,0 +1,327 @@
+{
+  "baseline": {
+    "engine": "legacy",
+    "rnaview_bin": "bin/rnaview"
+  },
+  "canonical_version": 1,
+  "converters": {
+    "gltf": "vrml-gltf-v1",
+    "svg": "ps-svg-v1"
+  },
+  "counts": {
+    "failed": 0,
+    "ok": 15,
+    "written": 15
+  },
+  "elapsed_ms": 38151,
+  "entries": [
+    {
+      "input": "test/mmcif/insertion_code/1EFW/1EFW.cif",
+      "input_sha256": "ecf437dd534144cc7759c1668aaa11e5cecc5d4285045f0337ddb3fa028eb4db",
+      "job_id": "1EFW__26f53222",
+      "outputs": {
+        "gltf": "test/golden_render/mmcif/insertion_code/1EFW/1EFW.cif.gltf.canon.gz",
+        "ps": "test/golden_render/mmcif/insertion_code/1EFW/1EFW.cif.ps.canon.gz",
+        "svg": "test/golden_render/mmcif/insertion_code/1EFW/1EFW.cif.svg.canon.gz",
+        "wrl": "test/golden_render/mmcif/insertion_code/1EFW/1EFW.cif.wrl.canon.gz",
+        "xml": "test/golden_render/mmcif/insertion_code/1EFW/1EFW.cif.xml.canon.gz"
+      },
+      "produced_names": {
+        "gltf": "1EFW.cif.wrl->vrml-gltf-v1",
+        "ps": "1EFW.cif.ps",
+        "svg": "1EFW.cif.ps->ps-svg-v1",
+        "wrl": "1EFW.cif.wrl",
+        "xml": "1EFW.cif.xml"
+      },
+      "status": "ok"
+    },
+    {
+      "input": "test/mmcif/insertion_code/1VVJ/1VVJ.cif",
+      "input_sha256": "cbcd59631d09fd5712bc3eda37d85cdad1e3ca5097c711d71956d40f6528d455",
+      "job_id": "1VVJ__c7a40134",
+      "outputs": {
+        "gltf": "test/golden_render/mmcif/insertion_code/1VVJ/1VVJ.cif.gltf.canon.gz",
+        "ps": "test/golden_render/mmcif/insertion_code/1VVJ/1VVJ.cif.ps.canon.gz",
+        "svg": "test/golden_render/mmcif/insertion_code/1VVJ/1VVJ.cif.svg.canon.gz",
+        "wrl": "test/golden_render/mmcif/insertion_code/1VVJ/1VVJ.cif.wrl.canon.gz",
+        "xml": "test/golden_render/mmcif/insertion_code/1VVJ/1VVJ.cif.xml.canon.gz"
+      },
+      "produced_names": {
+        "gltf": "1VVJ.cif.wrl->vrml-gltf-v1",
+        "ps": "1VVJ.cif.ps",
+        "svg": "1VVJ.cif.ps->ps-svg-v1",
+        "wrl": "1VVJ.cif.wrl",
+        "xml": "1VVJ.cif.xml"
+      },
+      "status": "ok"
+    },
+    {
+      "input": "test/mmcif/insertion_code/4ARC/4ARC.cif",
+      "input_sha256": "251dff9d780e3000412e782a6fc9b2f3bfebd99327727f8b69c8f4d30b80b342",
+      "job_id": "4ARC__ab9c7e43",
+      "outputs": {
+        "gltf": "test/golden_render/mmcif/insertion_code/4ARC/4ARC.cif.gltf.canon.gz",
+        "ps": "test/golden_render/mmcif/insertion_code/4ARC/4ARC.cif.ps.canon.gz",
+        "svg": "test/golden_render/mmcif/insertion_code/4ARC/4ARC.cif.svg.canon.gz",
+        "wrl": "test/golden_render/mmcif/insertion_code/4ARC/4ARC.cif.wrl.canon.gz",
+        "xml": "test/golden_render/mmcif/insertion_code/4ARC/4ARC.cif.xml.canon.gz"
+      },
+      "produced_names": {
+        "gltf": "4ARC.cif.wrl->vrml-gltf-v1",
+        "ps": "4ARC.cif.ps",
+        "svg": "4ARC.cif.ps->ps-svg-v1",
+        "wrl": "4ARC.cif.wrl",
+        "xml": "4ARC.cif.xml"
+      },
+      "status": "ok"
+    },
+    {
+      "input": "test/mmcif/nmr_structure/8if5/8if5.cif",
+      "input_sha256": "de136375c89e799a6fef366be1066551694ac6679474694fa4d3b5b205d0e66b",
+      "job_id": "8if5__9ce4cf9f",
+      "outputs": {
+        "gltf": "test/golden_render/mmcif/nmr_structure/8if5/8if5.cif.gltf.canon.gz",
+        "ps": "test/golden_render/mmcif/nmr_structure/8if5/8if5.cif.ps.canon.gz",
+        "svg": "test/golden_render/mmcif/nmr_structure/8if5/8if5.cif.svg.canon.gz",
+        "wrl": "test/golden_render/mmcif/nmr_structure/8if5/8if5.cif.wrl.canon.gz",
+        "xml": "test/golden_render/mmcif/nmr_structure/8if5/8if5.cif.xml.canon.gz"
+      },
+      "produced_names": {
+        "gltf": "8if5.cif.wrl->vrml-gltf-v1",
+        "ps": "8if5.cif.ps",
+        "svg": "8if5.cif.ps->ps-svg-v1",
+        "wrl": "8if5.cif.wrl",
+        "xml": "8if5.cif.xml"
+      },
+      "status": "ok"
+    },
+    {
+      "input": "test/mmcif/other/6pom/6pom.cif",
+      "input_sha256": "d794928fc388c8f2c13a7d87b9ffb8e9664d181f8d1d43dadca533131780fec0",
+      "job_id": "6pom__82d3711c",
+      "outputs": {
+        "gltf": "test/golden_render/mmcif/other/6pom/6pom.cif.gltf.canon.gz",
+        "ps": "test/golden_render/mmcif/other/6pom/6pom.cif.ps.canon.gz",
+        "svg": "test/golden_render/mmcif/other/6pom/6pom.cif.svg.canon.gz",
+        "wrl": "test/golden_render/mmcif/other/6pom/6pom.cif.wrl.canon.gz",
+        "xml": "test/golden_render/mmcif/other/6pom/6pom.cif.xml.canon.gz"
+      },
+      "produced_names": {
+        "gltf": "6pom.cif.wrl->vrml-gltf-v1",
+        "ps": "6pom.cif.ps",
+        "svg": "6pom.cif.ps->ps-svg-v1",
+        "wrl": "6pom.cif.wrl",
+        "xml": "6pom.cif.xml"
+      },
+      "status": "ok"
+    },
+    {
+      "input": "test/mmcif/x-ray/3P4J/assembly-1/3p4j-assembly1.cif",
+      "input_sha256": "2047c2e179e323c0fbdc9c6b38aa82d0ad2c98a077a513acb0770217d4cc4ea2",
+      "job_id": "3p4j-assembly1__b2610a38",
+      "outputs": {
+        "gltf": "test/golden_render/mmcif/x-ray/3P4J/assembly-1/3p4j-assembly1.cif.gltf.canon.gz",
+        "ps": "test/golden_render/mmcif/x-ray/3P4J/assembly-1/3p4j-assembly1.cif.ps.canon.gz",
+        "svg": "test/golden_render/mmcif/x-ray/3P4J/assembly-1/3p4j-assembly1.cif.svg.canon.gz",
+        "wrl": "test/golden_render/mmcif/x-ray/3P4J/assembly-1/3p4j-assembly1.cif.wrl.canon.gz",
+        "xml": "test/golden_render/mmcif/x-ray/3P4J/assembly-1/3p4j-assembly1.cif.xml.canon.gz"
+      },
+      "produced_names": {
+        "gltf": "3p4j-assembly1.cif.wrl->vrml-gltf-v1",
+        "ps": "3p4j-assembly1.cif.ps",
+        "svg": "3p4j-assembly1.cif.ps->ps-svg-v1",
+        "wrl": "3p4j-assembly1.cif.wrl",
+        "xml": "3p4j-assembly1.cif.xml"
+      },
+      "status": "ok"
+    },
+    {
+      "input": "test/mmcif/x-ray/434D/assembly-1/434d-assembly1.cif",
+      "input_sha256": "e47ed2a4d30a92bfd8427a8747e6d83c5fe38f8f3524ba44b679aaef8831efdf",
+      "job_id": "434d-assembly1__b2a692ef",
+      "outputs": {
+        "gltf": "test/golden_render/mmcif/x-ray/434D/assembly-1/434d-assembly1.cif.gltf.canon.gz",
+        "ps": "test/golden_render/mmcif/x-ray/434D/assembly-1/434d-assembly1.cif.ps.canon.gz",
+        "svg": "test/golden_render/mmcif/x-ray/434D/assembly-1/434d-assembly1.cif.svg.canon.gz",
+        "wrl": "test/golden_render/mmcif/x-ray/434D/assembly-1/434d-assembly1.cif.wrl.canon.gz",
+        "xml": "test/golden_render/mmcif/x-ray/434D/assembly-1/434d-assembly1.cif.xml.canon.gz"
+      },
+      "produced_names": {
+        "gltf": "434d-assembly1.cif.wrl->vrml-gltf-v1",
+        "ps": "434d-assembly1.cif.ps",
+        "svg": "434d-assembly1.cif.ps->ps-svg-v1",
+        "wrl": "434d-assembly1.cif.wrl",
+        "xml": "434d-assembly1.cif.xml"
+      },
+      "status": "ok"
+    },
+    {
+      "input": "test/mmcif/x-ray/434D/assembly-2/434d-assembly2.cif",
+      "input_sha256": "1b5176799852c11e5fe06df10648751ea85d2e5d0fef2eca00dfd8aad8f7180b",
+      "job_id": "434d-assembly2__8a1cb1b7",
+      "outputs": {
+        "gltf": "test/golden_render/mmcif/x-ray/434D/assembly-2/434d-assembly2.cif.gltf.canon.gz",
+        "ps": "test/golden_render/mmcif/x-ray/434D/assembly-2/434d-assembly2.cif.ps.canon.gz",
+        "svg": "test/golden_render/mmcif/x-ray/434D/assembly-2/434d-assembly2.cif.svg.canon.gz",
+        "wrl": "test/golden_render/mmcif/x-ray/434D/assembly-2/434d-assembly2.cif.wrl.canon.gz",
+        "xml": "test/golden_render/mmcif/x-ray/434D/assembly-2/434d-assembly2.cif.xml.canon.gz"
+      },
+      "produced_names": {
+        "gltf": "434d-assembly2.cif.wrl->vrml-gltf-v1",
+        "ps": "434d-assembly2.cif.ps",
+        "svg": "434d-assembly2.cif.ps->ps-svg-v1",
+        "wrl": "434d-assembly2.cif.wrl",
+        "xml": "434d-assembly2.cif.xml"
+      },
+      "status": "ok"
+    },
+    {
+      "input": "test/mmcif/x-ray/4NMG/assembly-1/4nmg-assembly1.cif",
+      "input_sha256": "85a8128b7376f61e947024939866a2f3681408f924aa5b24570c7c50cce3b26b",
+      "job_id": "4nmg-assembly1__2f46a8f9",
+      "outputs": {
+        "gltf": "test/golden_render/mmcif/x-ray/4NMG/assembly-1/4nmg-assembly1.cif.gltf.canon.gz",
+        "ps": "test/golden_render/mmcif/x-ray/4NMG/assembly-1/4nmg-assembly1.cif.ps.canon.gz",
+        "svg": "test/golden_render/mmcif/x-ray/4NMG/assembly-1/4nmg-assembly1.cif.svg.canon.gz",
+        "wrl": "test/golden_render/mmcif/x-ray/4NMG/assembly-1/4nmg-assembly1.cif.wrl.canon.gz",
+        "xml": "test/golden_render/mmcif/x-ray/4NMG/assembly-1/4nmg-assembly1.cif.xml.canon.gz"
+      },
+      "produced_names": {
+        "gltf": "4nmg-assembly1.cif.wrl->vrml-gltf-v1",
+        "ps": "4nmg-assembly1.cif.ps",
+        "svg": "4nmg-assembly1.cif.ps->ps-svg-v1",
+        "wrl": "4nmg-assembly1.cif.wrl",
+        "xml": "4nmg-assembly1.cif.xml"
+      },
+      "status": "ok"
+    },
+    {
+      "input": "test/pdb/pdb1nvy/pdb1nvy.ent",
+      "input_sha256": "3d53e3167aa61bd3ab6e507c5de442f166f1abf469b8a3f167c940ad7bb97284",
+      "job_id": "pdb1nvy__e152e1d2",
+      "outputs": {
+        "gltf": "test/golden_render/pdb/pdb1nvy/pdb1nvy.ent.gltf.canon.gz",
+        "ps": "test/golden_render/pdb/pdb1nvy/pdb1nvy.ent.ps.canon.gz",
+        "svg": "test/golden_render/pdb/pdb1nvy/pdb1nvy.ent.svg.canon.gz",
+        "wrl": "test/golden_render/pdb/pdb1nvy/pdb1nvy.ent.wrl.canon.gz",
+        "xml": "test/golden_render/pdb/pdb1nvy/pdb1nvy.ent.xml.canon.gz"
+      },
+      "produced_names": {
+        "gltf": "pdb1nvy.ent_new.wrl->vrml-gltf-v1",
+        "ps": "pdb1nvy.ent.ps",
+        "svg": "pdb1nvy.ent.ps->ps-svg-v1",
+        "wrl": "pdb1nvy.ent_new.wrl",
+        "xml": "pdb1nvy.ent.xml"
+      },
+      "status": "ok"
+    },
+    {
+      "input": "test/pdb/pdb1nvy/pdb1nvy.pdb",
+      "input_sha256": "3d53e3167aa61bd3ab6e507c5de442f166f1abf469b8a3f167c940ad7bb97284",
+      "job_id": "pdb1nvy__93035b1b",
+      "outputs": {
+        "gltf": "test/golden_render/pdb/pdb1nvy/pdb1nvy.pdb.gltf.canon.gz",
+        "ps": "test/golden_render/pdb/pdb1nvy/pdb1nvy.pdb.ps.canon.gz",
+        "svg": "test/golden_render/pdb/pdb1nvy/pdb1nvy.pdb.svg.canon.gz",
+        "wrl": "test/golden_render/pdb/pdb1nvy/pdb1nvy.pdb.wrl.canon.gz",
+        "xml": "test/golden_render/pdb/pdb1nvy/pdb1nvy.pdb.xml.canon.gz"
+      },
+      "produced_names": {
+        "gltf": "pdb1nvy.pdb_new.wrl->vrml-gltf-v1",
+        "ps": "pdb1nvy.pdb.ps",
+        "svg": "pdb1nvy.pdb.ps->ps-svg-v1",
+        "wrl": "pdb1nvy.pdb_new.wrl",
+        "xml": "pdb1nvy.pdb.xml"
+      },
+      "status": "ok"
+    },
+    {
+      "input": "test/pdb/test1/test1.pdb",
+      "input_sha256": "8ea4577858af1c14f4a4ae0cd67849833407cd05698e68d166c0d48fa8325184",
+      "job_id": "test1__704911ff",
+      "outputs": {
+        "gltf": "test/golden_render/pdb/test1/test1.pdb.gltf.canon.gz",
+        "ps": "test/golden_render/pdb/test1/test1.pdb.ps.canon.gz",
+        "svg": "test/golden_render/pdb/test1/test1.pdb.svg.canon.gz",
+        "wrl": "test/golden_render/pdb/test1/test1.pdb.wrl.canon.gz",
+        "xml": "test/golden_render/pdb/test1/test1.pdb.xml.canon.gz"
+      },
+      "produced_names": {
+        "gltf": "test1.pdb_new.wrl->vrml-gltf-v1",
+        "ps": "test1.pdb.ps",
+        "svg": "test1.pdb.ps->ps-svg-v1",
+        "wrl": "test1.pdb_new.wrl",
+        "xml": "test1.pdb.xml"
+      },
+      "status": "ok"
+    },
+    {
+      "input": "test/pdb/tr0001/tr0001.pdb",
+      "input_sha256": "1f68983f9102efc80fb6ea4ee869e1a705eafa2c854af5076073408bf85f1c1d",
+      "job_id": "tr0001__561f5292",
+      "outputs": {
+        "gltf": "test/golden_render/pdb/tr0001/tr0001.pdb.gltf.canon.gz",
+        "ps": "test/golden_render/pdb/tr0001/tr0001.pdb.ps.canon.gz",
+        "svg": "test/golden_render/pdb/tr0001/tr0001.pdb.svg.canon.gz",
+        "wrl": "test/golden_render/pdb/tr0001/tr0001.pdb.wrl.canon.gz",
+        "xml": "test/golden_render/pdb/tr0001/tr0001.pdb.xml.canon.gz"
+      },
+      "produced_names": {
+        "gltf": "tr0001.pdb_new.wrl->vrml-gltf-v1",
+        "ps": "tr0001.pdb.ps",
+        "svg": "tr0001.pdb.ps->ps-svg-v1",
+        "wrl": "tr0001.pdb_new.wrl",
+        "xml": "tr0001.pdb.xml"
+      },
+      "status": "ok"
+    },
+    {
+      "input": "test/pdb/url064/url064.pdb",
+      "input_sha256": "169b6bd1a5a634707dbef30206e448b7068ecc5c296f810c0532d6c4e06d954b",
+      "job_id": "url064__bc7ec225",
+      "outputs": {
+        "gltf": "test/golden_render/pdb/url064/url064.pdb.gltf.canon.gz",
+        "ps": "test/golden_render/pdb/url064/url064.pdb.ps.canon.gz",
+        "svg": "test/golden_render/pdb/url064/url064.pdb.svg.canon.gz",
+        "wrl": "test/golden_render/pdb/url064/url064.pdb.wrl.canon.gz",
+        "xml": "test/golden_render/pdb/url064/url064.pdb.xml.canon.gz"
+      },
+      "produced_names": {
+        "gltf": "url064.pdb_new.wrl->vrml-gltf-v1",
+        "ps": "url064.pdb.ps",
+        "svg": "url064.pdb.ps->ps-svg-v1",
+        "wrl": "url064.pdb_new.wrl",
+        "xml": "url064.pdb.xml"
+      },
+      "status": "ok"
+    },
+    {
+      "input": "test/pdb/urx053/urx053.pdb",
+      "input_sha256": "29a19d7eac803e81cbf9226145b7db31e6669733efd0529493d3976d9f8c7b50",
+      "job_id": "urx053__93caf9b1",
+      "outputs": {
+        "gltf": "test/golden_render/pdb/urx053/urx053.pdb.gltf.canon.gz",
+        "ps": "test/golden_render/pdb/urx053/urx053.pdb.ps.canon.gz",
+        "svg": "test/golden_render/pdb/urx053/urx053.pdb.svg.canon.gz",
+        "wrl": "test/golden_render/pdb/urx053/urx053.pdb.wrl.canon.gz",
+        "xml": "test/golden_render/pdb/urx053/urx053.pdb.xml.canon.gz"
+      },
+      "produced_names": {
+        "gltf": "urx053.pdb_new.wrl->vrml-gltf-v1",
+        "ps": "urx053.pdb.ps",
+        "svg": "urx053.pdb.ps->ps-svg-v1",
+        "wrl": "urx053.pdb_new.wrl",
+        "xml": "urx053.pdb.xml"
+      },
+      "status": "ok"
+    }
+  ],
+  "formats": [
+    "ps",
+    "xml",
+    "svg",
+    "wrl",
+    "gltf"
+  ],
+  "schema_version": 1
+}

@@ -3,7 +3,7 @@
     "unapproved_ids": []
   },
   "baseline": {
-    "elapsed_ms": 112,
+    "elapsed_ms": 125,
     "log": "out_phase3_gate_c/cases/434d-assembly2__8a1cb1b7/legacy-v1/rust.log",
     "options": {
       "engine": "rust",
@@ -21,7 +21,7 @@
     "pairs_json": "out_phase3_gate_c/cases/434d-assembly2__8a1cb1b7/legacy-v1/pairs.json"
   },
   "candidate": {
-    "elapsed_ms": 113,
+    "elapsed_ms": 117,
     "log": "out_phase3_gate_c/cases/434d-assembly2__8a1cb1b7/science-v1/rust.log",
     "options": {
       "engine": "rust",

@@ -338,3 +338,105 @@ Gate C 用于把 “science-v1 相对 legacy-v1 的差异” 做可落盘、可�
 ---
 
 如果你希望下一步更“工程化”：我可以基于这份 spec 再补一份 `pairs.json` 的严格 JSON Schema（draft-07/2020-12）+ 若干 golden 样例（从 `test/**.out` 自动导出），用于后续 CI/回归。 
+
+## 5. Phase 4：渲染与格式现代化（Gate D）
+
+Phase 4 的目标是：**在不改变 core（Phase 0–3 已锁定）** 的前提下，把 legacy 的 2D/3D 产物做成“可复现、可回归、可对齐”的现代化输出（并新增 SVG/glTF）。
+
+本阶段的“完全一致”定义为：**先做 normalization，再 byte‑exact（diff 0）**；并且 **baseline 是 legacy `rnaview -p/-v`**（在 CI/Linux 容器中）。
+
+### 5.1 输入契约（Render Inputs）
+
+渲染器以 `pairs.json` 为主输入（权威 core），并允许按 `pairs.json.source.path` 再读取一次原始结构文件（PDB/mmCIF），以最小化 `pairs.json` schema 变动。
+
+渲染结果必须是以下输入的纯函数：
+- `pairs.json.core`（base_pairs/multiplets/stats）
+- `pairs.json.source.path` 指向的结构文件内容（用于坐标/链信息/残基名称等）
+- 固定的一组渲染选项（必须落盘到 `pairs.json.options`，至少包括）：
+  - mmCIF：`id_scheme=auth|label`
+  - chain 选择（如 `chains=ABC` 或 `all`）
+  - NMR model 选择策略
+  - altloc 策略
+  - 分辨率过滤策略（若启用）
+- `semantics` + `policies`（legacy-v1/science-v1；渲染要能在两种语义下工作）
+
+### 5.2 输出契约（Render Outputs）
+
+对每个输入 job（与 Phase 2/3 相同的 job_id 规则），渲染器至少产出：
+
+2D：
+- `*.xml`（RNAML；legacy 兼容）
+- `*.ps`（PostScript；legacy 兼容）
+- `*.svg`（新增；与 legacy 2D 视图语义等价）
+
+3D：
+- `*.wrl`（VRML；legacy 兼容）
+- `*.gltf` 或 `*.glb`（新增；与 VRML 语义等价）
+
+> 注：SVG/glTF 的 baseline 仍然来自 legacy：2D 推荐以 legacy 的 `*.ps` 作为“渲染权威”（最终画出来的结果），用确定性的 PS→SVG 转换器生成 SVG golden；3D 仍以 legacy `*.wrl` 作为语义权威，再生成 glTF golden。
+
+### 5.3 Normalization（仅用于验收的规范化）
+
+Gate D 只对 **canonical（normalize 后）** 的产物做 byte‑exact 比较；golden 也存 canonical。
+
+Normalization 的目标是去掉“与渲染语义无关但会导致 diff”的字段；规则应当最小化且按格式分开定义（便于审计）。
+
+通用规则：
+- 统一换行符为 `LF`
+- 去掉行尾空白
+- 文件末尾保证单个 `LF`
+
+PS（`.ps`）：
+- 去掉 `%%CreationDate:` 等时间戳行（其余保持不变）
+- 字体/线宽/颜色/版面参数必须复刻 legacy（基线见 `BASEPARS/ps_image.par`）
+
+VRML（`.wrl`）：
+- 去掉 `# Creation Date:` 与 `# UserName:` 行（其余保持不变）
+
+RNAML/XML（`.xml`）与 SVG（`.svg`）：
+- 保守起见，默认只做通用规则（不做重排/重格式化），避免破坏文本节点中的表格布局
+- 若后续发现“仅空白差异”高频，可再引入更强的 canonicalization（需写入 spec 并产出迁移说明）
+
+glTF（`.gltf/.glb`）：
+- 若输出为 `.gltf`（JSON），canonical 形式应满足：键排序稳定、浮点格式稳定、无随机 id
+- 若输出为 `.glb`，建议回归时先投影为 canonical `.gltf`（或自定义 IR）再比较
+
+Normalization 是否作为“最终落盘输出”：
+- 默认只用于验收（保留 raw 输出便于 debug）
+- 若 canonical 与 raw 在可视化上无可见差异，可选择直接落盘 canonical 作为最终输出
+
+### 5.4 Gate D（渲染验收：legacy 基线 + allowlist）
+
+Gate D 的目标是把渲染产物纳入与 Phase 2/3 同等级别的回归体系：
+
+- 回归集：与 Gate C 一致（`test/pdb` + `test/mmcif`）
+- baseline：legacy `rnaview -p`（2D）与 `rnaview -v`（3D）
+- golden：存储 canonical 输出（建议压缩存储，例如 `*.canon.gz`）
+- 允许差异：与 Gate C 类似，使用 allowlist 管控（例如 mmCIF 去氢 bug 在 `science-v1` 下导致的可视化差异）
+
+工具与目录约定（当前仓库）：
+- 冻结（生成 canonical goldens）：`python3 tools/rnaview_gate_d.py freeze`（默认输出到 `test/golden_render/manifest.json`）
+- 对比（生成报告与 diff 事件）：`python3 tools/rnaview_gate_d.py compare --out-dir out_phase4_gate_d`
+  - candidate renderer（默认）：`python3 tools/rnaview_render.py render`（可用 `--candidate-cmd ...` 替换成 Rust/新渲染端；或用 `--candidate-engine legacy` 强制直接跑 legacy；注意 `--candidate-cmd` 需要放在命令行最后）
+  - new-renderer→golden（推荐入口）：`CANDIDATE_BACKEND=rustcore bash test_phase4_gate_d.sh`（或 `rustcore-release`）
+  - 视觉 sanity（人工）：对少量代表 case，把 legacy `*.ps` 与 `out_phase4_gate_d/cases/*/candidate.svg` 并排打开确认“画得对”。必要时先用 `python3 tools/rnaview_render.py render --input <file> --out-dir out_legacy_render --formats ps,xml,wrl` 生成一份干净的 legacy 输出用于对照。
+
+allowlist：
+- 文件：`test/gate_d_allowlist.yaml`
+- 粒度：事件级（稳定 id）
+- id 必须至少包含：`input_id` + `format(ps|xml|svg|wrl|gltf)` + `semantics` + `renderer_version` + `hash(payload)`
+
+退出码建议：
+- `0`：无 failed 且无 unapproved diff
+- `1`：存在 failed 或 unapproved diff
+- `2`：参数/输入错误
+
+### 5.5 样式映射（legacy style map）
+
+为了保证 PS/SVG 在“视觉语义”上一致，样式映射必须进入规格：
+- 字体：使用 legacy 的内建字体设置（当前基线见 `BASEPARS/ps_image.par`，例如 `/Times-Bold`）
+- 线宽：`W1/W2/W3/W4`（`1 / 1.5 / 2 / 3`）
+- 颜色：按 legacy 的 HSB/RGB 配置复刻（`BASEPARS/ps_image.par` 中的 `Al/Cl/Gl/Ul/...` 以及 minor/major saturation）
+- 线型：`LINE/DASHLINE` 等（legacy dash 模式 `[2 4]`）
+
+> 这些参数在 Phase 4 的实现中应当被抽象成可版本化的“style preset”（例如 `style=legacy-ps-v1`），并作为 `renderer_version` 的一部分参与 Gate D 的稳定 id 计算。

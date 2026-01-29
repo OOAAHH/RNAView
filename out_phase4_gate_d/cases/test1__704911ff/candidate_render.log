@@ -1,0 +1,32 @@
+
+JOB finished! Time used: 0.03 seconds
+Processing a single file ...
+
+PDB data file name: test1.pdb_new
+
+########################################################RNA/DNA chain_ID:  A  from residue  948 to  981
+
+The backbone torsion angles are in test1.pdb_new_torsion.out
+
+Finding all the base pairs...
+pair-type    1    4   23 Ssc
+pair-type    2    9   13 WWt
+pair-type    3   15   26 ++c
+pair-type    4   16   25 ++c
+  The total base pairs =   4 (from   34 bases);
+No pattern found!
+  Loop 1 is from residue 17 to residue 24.
+  Number of Helix =   1; The longest is number  1
+
+Ploting 2D structure...
+Input file is (test1.pdb.xml) with number of chains (1)
+helix_width =    104.38
+Number of base pairs (including tertiary interactions):   6
+Number of helix (anti-parallel):   1
+Number of single strand:   3
+
+2D structure (PS) finished! see output file: test1.pdb.ps
+
+3D structure (VRML) finished! see output file: test1.pdb_new.wrl
+
+Time used: 0.03 seconds

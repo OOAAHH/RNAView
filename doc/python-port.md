@@ -336,22 +336,26 @@ CI：分层跑（建议拆成独立 job，便于定位失败与并行）
 - bench（只监控性能，不做硬门槛）：`python3 tools/rnaview_bench.py compare --suite phase2 --runs 3 -o out/bench_phase3.json`
 性能：只在不改变 legacy-v1 结果前提下优化（空间索引、邻域筛选、并行），并用基准锁住收益（只报警，不 hard-fail）。
 Phase 4：渲染与格式现代化（在不动 core 的前提下扩展产物）
-M4.0 输出契约与 API 分层（先定“中间表示”，再定渲染）
-定一个确定性的 2D 中间格式（建议 layout.json），让渲染变成纯函数：
-输入：pairs.json（legacy-v1 或 science-v1 都可）
-输出：layout.json（坐标、边、标签、样式 key）
-.ps/.svg/.png 都从 layout.json 生成，避免把“布局不确定性”散落在渲染端。
-M4.1 2D：SVG 优先，PS 兼容（呼应 python-port.md (line 182)）
-新增 render 子命令（Python 侧更合适），例如：
-rnaview render --input pairs.json --format svg|png|pdf|ps
-PS 不追求 byte‑exact（通常做不到），但要保证结构/标注一致（用 Gate D 验收）。
-M4.2 3D：保留 VRML，新增更现代出口
-VRML 作为 legacy 兼容输出；新增 glTF 或生成 PyMOL/ChimeraX 脚本（可复用生态）。
-M4.3 Gate D（渲染验收）
-不做 byte‑exact；做“结构一致 + 低噪声”的回归：
-对 layout.json 做确定性 diff（首选）
-或对 SVG 做 normalization 后 diff（去掉时间戳/随机 id/浮点抖动）
-或做像素级快照（成本高，后置）
+M4.0 输出契约（先把验收口径写死）
+目标：在 CI/Linux 容器里，以 legacy `rnaview -p/-v` 为 baseline，做到：
+- 允许中间步骤不同，但最终产物（canonical/normalize 后）必须 `diff 0`
+- golden 存 canonical（normalize 后的输出；建议压缩存储）
+- 渲染器输入只读 `pairs.json`，并允许按 `pairs.json.source.path` 再读一次结构文件（最小化 schema 变动）
+- 固定参数集必须显式化并落盘（`--label/auth`、链选择、NMR model、altloc、分辨率过滤等），避免“输入不唯一”造成的伪 diff
+
+M4.1 2D：RNAML/XML + PS + SVG
+- RNAML/XML、PS：对齐 legacy `-p`（normalize 后 diff 0）
+- PS 样式完全复刻 legacy（字体/线宽/颜色/线型等；基线见 `BASEPARS/ps_image.par`）
+- SVG：以 legacy `*.ps` 为“渲染权威”，用确定性的 PS→SVG 转换器生成（保证与 legacy 最终图一致；RNAML/XML→SVG 可作为可选语义渲染/调试）
+
+M4.2 3D：VRML + glTF
+- VRML：对齐 legacy `-v`（normalize 后 diff 0）
+- glTF：与 VRML 语义等价；golden 推荐由 legacy VRML 通过确定性转换器生成
+
+M4.3 Gate D（渲染验收 + allowlist）
+- 目标：canonical 输出 byte‑exact（diff 0）
+- allowlist：类似 Gate C，事件级稳定 id（包含 input_id/format/semantics/renderer_version 等）
+- allowlist 文件：`test/gate_d_allowlist.yaml`
 哪些必须 byte‑exact？哪些可以科学修复？
 必须保持 byte‑exact（对 legacy golden）
 legacy-v1 下的 FILEOUT.out 全文（Gate B），包含解析/过滤/排序/空格/换行等所有历史行为。
