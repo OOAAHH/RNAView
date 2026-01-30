@@ -27,6 +27,74 @@ static int buflen = 0;
 static int def_count = 0;
 static FILE *vrml_outfile;
 
+static int load_pairs_from_out(const char *out_path, long max_pairs, long **bs_pairs_tot, char **pair_type, long *out_num_pair_tot)
+{
+    FILE *finp;
+    char str[256];
+    long num_pair_tot = 0;
+    int in_bp = 0;
+
+    if (out_num_pair_tot)
+        *out_num_pair_tot = 0;
+
+    if (out_path == NULL || out_path[0] == '\0')
+        return 0;
+
+    finp = fopen(out_path, "r");
+    if (finp == NULL)
+        return 0;
+
+    while (fgets(str, sizeof str, finp) != NULL)
+    {
+        if (!in_bp)
+        {
+            if (strstr(str, "BEGIN_base-pair"))
+                in_bp = 1;
+            continue;
+        }
+        if (strstr(str, "END_base-pair"))
+            break;
+        if (strstr(str, "stack"))
+            continue;
+
+        if (num_pair_tot >= max_pairs)
+            break;
+
+        {
+            long k1 = 0, k2 = 0;
+            char tmp_str[4];
+            size_t len;
+
+            if (sscanf(str, "%ld_%ld", &k1, &k2) != 2)
+                continue;
+
+            len = strlen(str);
+            tmp_str[0] = '.';
+            tmp_str[1] = '.';
+            tmp_str[2] = 'c';
+            tmp_str[3] = '\0';
+            if (len > 37)
+            {
+                tmp_str[0] = str[33];
+                tmp_str[1] = str[35];
+                tmp_str[2] = str[37];
+            }
+
+            num_pair_tot++;
+            bs_pairs_tot[num_pair_tot][1] = k1;
+            bs_pairs_tot[num_pair_tot][2] = k2;
+            strcpy(pair_type[num_pair_tot], tmp_str);
+        }
+    }
+
+    fclose(finp);
+    if (!in_bp)
+        return 0;
+    if (out_num_pair_tot)
+        *out_num_pair_tot = num_pair_tot;
+    return 1;
+}
+
 void process_3d_fig(char *pdbfile, long num_residue, char *bseq, long **seidx,
                     char **AtomName, char **ResName, char *ChainID, double **xyz,
                     long num_pair_tot, char **pair_type, long **bs_pairs_tot)
@@ -34,6 +102,17 @@ void process_3d_fig(char *pdbfile, long num_residue, char *bseq, long **seidx,
     double **C4xyz, xyz_avg[4];
     long i, j, k, k1, k2, n, nchain, **chain_idx;
     char **resnam, str[5], outfile[256];
+    long num_pair_tot_override = 0;
+    long num_pair_tot_used = num_pair_tot;
+
+    {
+        const char *override_out = getenv("RNAVIEW_OUT_PATH");
+        if (override_out != NULL && override_out[0] != '\0')
+        {
+            if (load_pairs_from_out(override_out, 2 * num_residue, bs_pairs_tot, pair_type, &num_pair_tot_override))
+                num_pair_tot_used = num_pair_tot_override;
+        }
+    }
 
     sprintf(outfile, "%s.wrl", pdbfile);
 
@@ -92,13 +171,13 @@ void process_3d_fig(char *pdbfile, long num_residue, char *bseq, long **seidx,
         label_residue(i, chain_idx, C4xyz, resnam);
     }
 
-    for (i = 1; i <= num_pair_tot; i++)
+    for (i = 1; i <= num_pair_tot_used; i++)
     {
         k1 = bs_pairs_tot[i][1];
         k2 = bs_pairs_tot[i][2];
         if (k1 != 0 && k2 != 0)
         {
-            for (k = 1; k <= num_pair_tot; k++)
+            for (k = 1; k <= num_pair_tot_used; k++)
             {
                 if (bs_pairs_tot[k][1] == k1 && bs_pairs_tot[k][2] == k2)
                 {

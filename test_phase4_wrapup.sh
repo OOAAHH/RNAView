@@ -9,7 +9,6 @@ bash "$ROOT_DIR/tools/cargo_sysroot.sh" test --manifest-path "$ROOT_DIR/rust/Car
 python3 -m unittest discover -s "$ROOT_DIR/tools" -p "test_*.py"
 
 echo "== phase4: Gate D (render canonical regression) ==" >&2
-bash "$ROOT_DIR/test_phase4_gate_d.sh"
+CANDIDATE_BACKEND="${CANDIDATE_BACKEND:-pairs-out}" bash "$ROOT_DIR/test_phase4_gate_d.sh"
 
 echo "OK" >&2
-

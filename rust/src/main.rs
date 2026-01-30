@@ -1,6 +1,7 @@
 use rnaview_hotcore::{
-    compute_out_full_from_structure_with_policies, extract_core_from_out_path, extract_core_from_out_str,
-    parse_structure_bases, write_out_core, write_out_full, BaseResidue, ChainIdPolicy, Core, HydrogenPolicy,
+    compute_out_full_from_structure_with_policies, extract_core_from_out_path_with_out_index,
+    extract_core_from_out_str_with_out_index, parse_structure_bases, render_vrml_from_pairs_json,
+    write_out_core, write_out_full, BaseResidue, ChainIdPolicy, Core, HydrogenPolicy,
     MissingInsertionCodePolicy, PairsJson, Semantics, SemanticsConfig, Source,
 };
 use pdbtbx::{
@@ -14,7 +15,7 @@ use std::process::Stdio;
 
 fn usage() -> ! {
     eprintln!(
-        "Usage:\n  rnaview-hotcore from-out <file.out> [-o pairs.json]\n  rnaview-hotcore from-structure <file.pdb|file.cif>\n      [--format pdb|cif]\n      [--oracle legacy|out|compute]\n      [--mmcif-parser legacy|pdbtbx]\n      [--semantics legacy-v1|science-v1]\n      [--hydrogen-policy legacy-mmcif-bug|discard-all|keep-all]\n      [--missing-insertion-code legacy-question-mark|none]\n      [--chain-id-policy legacy-1char|unique-1char]\n      [-o pairs.json]\n      [--emit-out file.out]\n  rnaview-hotcore write-out <pairs.json> [-o candidate.out]"
+        "Usage:\n  rnaview-hotcore from-out <file.out> [-o pairs.json]\n  rnaview-hotcore from-structure <file.pdb|file.cif>\n      [--format pdb|cif]\n      [--oracle legacy|out|compute]\n      [--mmcif-parser legacy|pdbtbx]\n      [--semantics legacy-v1|science-v1]\n      [--hydrogen-policy legacy-mmcif-bug|discard-all|keep-all]\n      [--missing-insertion-code legacy-question-mark|none]\n      [--chain-id-policy legacy-1char|unique-1char]\n      [-o pairs.json]\n      [--emit-out file.out]\n  rnaview-hotcore write-out <pairs.json> [-o candidate.out]\n  rnaview-hotcore render-wrl <pairs.json> [--source <file.pdb|file.cif>] [-o file.wrl]\n  rnaview-hotcore render-2d <pairs.json> [--source <file.pdb|file.cif>] [--out-xml file.xml] [--out-ps file.ps]"
     );
     std::process::exit(2);
 }
@@ -327,7 +328,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 usage();
             }
 
-            let core: Core = extract_core_from_out_path(&input)?;
+            let core: Core = extract_core_from_out_path_with_out_index(&input)?;
             let pairs = PairsJson {
                 schema_version: 1,
                 source: Some(Source {
@@ -496,7 +497,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
 
                 let bases: Vec<BaseResidue> = parse_structure_bases(&input)?;
-                let core: Core = extract_core_from_out_path(&oracle_out)?;
+                let core: Core = extract_core_from_out_path_with_out_index(&oracle_out)?;
 
                 let want = core
                     .stats
@@ -616,7 +617,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     std::fs::write(dst, out_text.as_bytes())?;
                 }
 
-                let core: Core = extract_core_from_out_str(&out_text);
+                let core: Core = extract_core_from_out_str_with_out_index(&out_text);
                 let pairs = PairsJson {
                     schema_version: 1,
                     source: Some(Source {
@@ -751,7 +752,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 std::fs::copy(&produced_out, dst)?;
             }
 
-            let core: Core = extract_core_from_out_path(&produced_out)?;
+            let core: Core = extract_core_from_out_path_with_out_index(&produced_out)?;
             let pairs = PairsJson {
                 schema_version: 1,
                 source: Some(Source {
@@ -796,6 +797,139 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 std::fs::write(out_path, out_text)?;
             } else {
                 print!("{out_text}");
+            }
+            Ok(())
+        }
+        "render-wrl" => {
+            if args.is_empty() {
+                usage();
+            }
+            let input = PathBuf::from(args.remove(0));
+            let mut output: Option<PathBuf> = None;
+            let mut source_override: Option<PathBuf> = None;
+
+            while !args.is_empty() {
+                let flag = args.remove(0);
+                if flag == "-o" || flag == "--output" {
+                    if args.is_empty() {
+                        usage();
+                    }
+                    output = Some(PathBuf::from(args.remove(0)));
+                    continue;
+                }
+                if flag == "--source" {
+                    if args.is_empty() {
+                        usage();
+                    }
+                    source_override = Some(PathBuf::from(args.remove(0)));
+                    continue;
+                }
+                usage();
+            }
+
+            let pairs: PairsJson = serde_json::from_str(&std::fs::read_to_string(&input)?)?;
+            let source_path = if let Some(p) = source_override {
+                p
+            } else if let Some(src) = pairs.source.as_ref() {
+                PathBuf::from(&src.path)
+            } else {
+                return Err(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "pairs.json is missing .source.path; pass --source",
+                )));
+            };
+
+            let rnaview_root: PathBuf = match std::env::var_os("RNAVIEW") {
+                Some(p) => PathBuf::from(p),
+                None => PathBuf::from("."),
+            };
+            let basepars_vrml = rnaview_root.join("BASEPARS").join("vrml_image.par");
+
+            let policies = SemanticsConfig::defaults(Semantics::LegacyV1).policies.structure;
+            let wrl = render_vrml_from_pairs_json(&pairs, &source_path, &policies, &basepars_vrml)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+
+            if let Some(out_path) = output {
+                std::fs::write(out_path, wrl)?;
+            } else {
+                print!("{wrl}");
+            }
+            Ok(())
+        }
+        "render-2d" => {
+            if args.is_empty() {
+                usage();
+            }
+            let input = PathBuf::from(args.remove(0));
+            let mut out_xml: Option<PathBuf> = None;
+            let mut out_ps: Option<PathBuf> = None;
+            let mut source_override: Option<PathBuf> = None;
+
+            while !args.is_empty() {
+                let flag = args.remove(0);
+                if flag == "--source" {
+                    if args.is_empty() {
+                        usage();
+                    }
+                    source_override = Some(PathBuf::from(args.remove(0)));
+                    continue;
+                }
+                if flag == "--out-xml" {
+                    if args.is_empty() {
+                        usage();
+                    }
+                    out_xml = Some(PathBuf::from(args.remove(0)));
+                    continue;
+                }
+                if flag == "--out-ps" {
+                    if args.is_empty() {
+                        usage();
+                    }
+                    out_ps = Some(PathBuf::from(args.remove(0)));
+                    continue;
+                }
+                usage();
+            }
+
+            if out_xml.is_none() && out_ps.is_none() {
+                return Err(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "render-2d requires --out-xml and/or --out-ps",
+                )));
+            }
+
+            let pairs: PairsJson = serde_json::from_str(&std::fs::read_to_string(&input)?)?;
+            let source_path = if let Some(p) = source_override {
+                p
+            } else if let Some(src) = pairs.source.as_ref() {
+                PathBuf::from(&src.path)
+            } else {
+                return Err(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "pairs.json is missing .source.path; pass --source",
+                )));
+            };
+
+            let rnaview_root: PathBuf = match std::env::var_os("RNAVIEW") {
+                Some(p) => PathBuf::from(p),
+                None => PathBuf::from("."),
+            };
+            let basepars_ps_image = rnaview_root.join("BASEPARS").join("ps_image.par");
+
+            let structure_policies = SemanticsConfig::defaults(Semantics::LegacyV1).policies.structure;
+            let out = rnaview_hotcore::render_2d_from_pairs_json(
+                &pairs,
+                &source_path,
+                &structure_policies,
+                &basepars_ps_image,
+            )
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+
+            if let Some(p) = out_xml {
+                std::fs::write(p, out.xml)?;
+            }
+            if let Some(p) = out_ps {
+                std::fs::write(p, out.ps)?;
             }
             Ok(())
         }

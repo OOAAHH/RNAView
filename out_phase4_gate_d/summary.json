@@ -2,9 +2,11 @@
   "allowlist": "test/gate_d_allowlist.yaml",
   "baseline_manifest": "test/golden_render/manifest.json",
   "candidate_cmd": [
-    "/opt/conda/bin/python3",
-    "/workspaces/RNAView/tools/rnaview_render.py",
-    "render"
+    "python3",
+    "tools/rnaview_render.py",
+    "render",
+    "--backend",
+    "pairs-out-noc3d"
   ],
   "candidate_engine": "command",
   "counts": {
@@ -13,7 +15,7 @@
     "ok": 15,
     "unapproved": 0
   },
-  "elapsed_ms": 38304,
+  "elapsed_ms": 49466,
   "renderer_version": "dev",
   "results": [
     {

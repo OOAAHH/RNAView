@@ -162,8 +162,18 @@ void write_base_pair_mol(FILE *xml, long molID, char *parfile, long *chain_res,
     long nres1, nres2;
     FILE *finp;
 
-    /*    sprintf(inpfile, "%s.out", parfile);*/
-    sprintf(inpfile, "%s.out", FILEOUT);
+    {
+        const char *override_out = getenv("RNAVIEW_OUT_PATH");
+        if (override_out != NULL && override_out[0] != '\0')
+        {
+            snprintf(inpfile, sizeof(inpfile), "%s", override_out);
+        }
+        else
+        {
+            /*    sprintf(inpfile, "%s.out", parfile);*/
+            sprintf(inpfile, "%s.out", FILEOUT);
+        }
+    }
     finp = fopen(inpfile, "r");
     if (finp == NULL)
     {
@@ -234,7 +244,17 @@ void write_base_pair_int(FILE *xml, long i, long j, char *parfile, long *chain_r
     strcpy(tag7, "                     ");
     strcpy(tag8, "                        ");
 
-    sprintf(inpfile, "%s.out", parfile);
+    {
+        const char *override_out = getenv("RNAVIEW_OUT_PATH");
+        if (override_out != NULL && override_out[0] != '\0')
+        {
+            snprintf(inpfile, sizeof(inpfile), "%s", override_out);
+        }
+        else
+        {
+            sprintf(inpfile, "%s.out", parfile);
+        }
+    }
 
     finp = fopen(inpfile, "r");
     if (finp == NULL)

@@ -187,6 +187,7 @@ Rust (Hot Core Engine)
   - `res_i: ResidueId`, `res_j: ResidueId`
   - `base_i: str`, `base_j: str`
   - `kind: "pair" | "stacked" | "unknown"`
+  - `out_index: int | null`（可选；该行在 legacy `BEGIN_base-pair` block 中的 1‑based 顺序，用于需要 byte‑exact 复刻 legacy“输出顺序”的渲染端；不参与 core 语义等价判定）
   - `lw: str | null`（如 `W/H`、`+/+`、`-/-`、`S/?`）
   - `orientation: "cis" | "tran" | null`
   - `syn: { "i": bool, "j": bool }`
@@ -373,6 +374,9 @@ Phase 4 的目标是：**在不改变 core（Phase 0–3 已锁定）** 的前�
 - `*.wrl`（VRML；legacy 兼容）
 - `*.gltf` 或 `*.glb`（新增；与 VRML 语义等价）
 
+注意（legacy 行为复刻）：
+- VRML 的“交互连线/符号”只覆盖 `stats.total_pairs` 对应的 base pairs（不包含 `note` 中带 `!` 的 tertiary interactions，也不包含 `stacked`）。
+
 > 注：SVG/glTF 的 baseline 仍然来自 legacy：2D 推荐以 legacy 的 `*.ps` 作为“渲染权威”（最终画出来的结果），用确定性的 PS→SVG 转换器生成 SVG golden；3D 仍以 legacy `*.wrl` 作为语义权威，再生成 glTF golden。
 
 ### 5.3 Normalization（仅用于验收的规范化）
@@ -418,8 +422,8 @@ Gate D 的目标是把渲染产物纳入与 Phase 2/3 同等级别的回归体�
 - 冻结（生成 canonical goldens）：`python3 tools/rnaview_gate_d.py freeze`（默认输出到 `test/golden_render/manifest.json`）
 - 对比（生成报告与 diff 事件）：`python3 tools/rnaview_gate_d.py compare --out-dir out_phase4_gate_d`
   - candidate renderer（默认）：`python3 tools/rnaview_render.py render`（可用 `--candidate-cmd ...` 替换成 Rust/新渲染端；或用 `--candidate-engine legacy` 强制直接跑 legacy；注意 `--candidate-cmd` 需要放在命令行最后）
-  - new-renderer→golden（推荐入口）：`CANDIDATE_BACKEND=rustcore bash test_phase4_gate_d.sh`（或 `rustcore-release`）
-  - 视觉 sanity（人工）：对少量代表 case，把 legacy `*.ps` 与 `out_phase4_gate_d/cases/*/candidate.svg` 并排打开确认“画得对”。必要时先用 `python3 tools/rnaview_render.py render --input <file> --out-dir out_legacy_render --formats ps,xml,wrl` 生成一份干净的 legacy 输出用于对照。
+  - new-renderer→golden（推荐入口）：`CANDIDATE_BACKEND=pairs-out bash test_phase4_gate_d.sh`（或 `rustcore-release`/`rustcore`）
+  - 视觉 sanity（人工）：对少量代表 case，把 legacy `*.ps` 与 `out_phase4_gate_d/cases/*/candidate.svg` 并排打开确认“画得对”。Gate D 会在每个 case 下保留 `candidate.ps/xml/wrl/svg/gltf`；若想同时落盘 golden（canonical），可用 `python3 tools/rnaview_gate_d.py compare --emit-golden all`；若需要一份干净的 raw legacy 输出用于对照，可用 `python3 tools/rnaview_render.py render --backend legacy --input <file> --out-dir out_legacy_render --formats ps,xml,wrl`。
 
 allowlist：
 - 文件：`test/gate_d_allowlist.yaml`

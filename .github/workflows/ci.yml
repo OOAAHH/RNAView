@@ -65,3 +65,25 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
       - run: bash test_phase3_science.sh
 
+  gate-d:
+    name: "Gate D: render regression (legacy baseline)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
+      - run: EMIT_GOLDEN=on-diff CANDIDATE_BACKEND=pairs-out-noc3d bash test_phase4_gate_d.sh
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-d-report
+          path: out_phase4_gate_d

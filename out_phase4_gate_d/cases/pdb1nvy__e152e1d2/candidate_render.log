@@ -1,5 +1,5 @@
 
-JOB finished! Time used: 0.03 seconds
+JOB finished! Time used: 0.02 seconds
 Processing a single file ...
 
 PDB data file name: pdb1nvy.ent_new
@@ -29,6 +29,4 @@ Number of single strand:   2
 
 2D structure (PS) finished! see output file: pdb1nvy.ent.ps
 
-3D structure (VRML) finished! see output file: pdb1nvy.ent_new.wrl
-
-Time used: 0.03 seconds
+Time used: 0.02 seconds

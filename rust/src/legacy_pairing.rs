@@ -448,7 +448,7 @@ fn Hbond_pair(
     out
 }
 
-fn check_pairs(
+pub(crate) fn check_pairs(
     i: usize,
     j: usize,
     bseq: &[u8],
@@ -593,6 +593,15 @@ fn check_pairs(
     }
     if bpid == 2 {
         rtn_val[5] -= 1.5;
+    }
+
+    if bpid != 0 {
+        // Base-pair origin (avg) and per-base normals, matching legacy check_pairs layout.
+        for k in 1..=3 {
+            rtn_val[5 + k] = 0.5 * (org[i][k] + org[j][k]);
+            rtn_val[8 + k] = orien[i][6 + k];
+            rtn_val[11 + k] = orien[j][6 + k];
+        }
     }
     bpid
 }
@@ -1123,7 +1132,7 @@ fn LW_Saenger_correspond(bs1: u8, bs2: u8, type_field: &str) -> String {
     }
 }
 
-fn syn_or_anti(
+pub(crate) fn syn_or_anti(
     num_residue: usize,
     atom_name: &[AtomName4],
     seidx: &[[usize; 3]],

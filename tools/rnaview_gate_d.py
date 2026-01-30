@@ -169,6 +169,17 @@ def _gzip_read(path: Path) -> bytes:
         return f.read()
 
 
+def _copy_output_file(src: Path, dst: Path) -> Path:
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dst)
+    return dst
+
+
+def _maybe_write_bytes(path: Path, data: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+
+
 def _canonicalize_text(*, raw: bytes, fmt: str) -> bytes:
     # Canonicalize to LF text with no trailing whitespace, and strip unstable headers.
     if fmt == "gltf":
@@ -645,6 +656,17 @@ def _cmd_compare(args: argparse.Namespace) -> int:
     if not formats:
         raise RuntimeError(f"invalid render golden manifest (no formats): {manifest_path}")
 
+    if args.formats:
+        requested = [s.strip() for s in str(args.formats).split(",") if s.strip()]
+        supported = {"ps", "xml", "wrl", "svg", "gltf"}
+        for f in requested:
+            if f not in supported:
+                raise RuntimeError(f"unsupported format in --formats: {f} (supported: {sorted(supported)})")
+        missing = [f for f in requested if f not in formats]
+        if missing:
+            raise RuntimeError(f"--formats includes items not present in manifest: {missing} (manifest={manifest_path})")
+        formats = requested
+
     svg_converter_version = None
     if "svg" in formats:
         import rnaview_ps_svg
@@ -732,29 +754,33 @@ def _cmd_compare(args: argparse.Namespace) -> int:
                         want_wrl=want_wrl,
                     )
 
-                produced_map: dict[str, Path | None] = {
-                    "ps": ps_path,
-                    "xml": xml_path,
-                    "wrl": wrl_path,
-                    "svg": None,
-                    "gltf": None,
-                }
+                produced_map: dict[str, Path | None] = {"ps": None, "xml": None, "wrl": None, "svg": None, "gltf": None}
+                need_ps_file = ("ps" in formats) or ("svg" in formats)
+                need_wrl_file = ("wrl" in formats) or ("gltf" in formats)
+                if ps_path is not None and need_ps_file:
+                    produced_map["ps"] = _copy_output_file(ps_path, case_dir / "candidate.ps")
+                if xml_path is not None and "xml" in formats:
+                    produced_map["xml"] = _copy_output_file(xml_path, case_dir / "candidate.xml")
+                if wrl_path is not None and need_wrl_file:
+                    produced_map["wrl"] = _copy_output_file(wrl_path, case_dir / "candidate.wrl")
                 if "svg" in formats:
-                    if ps_path is None:
+                    ps_src = produced_map.get("ps")
+                    if ps_src is None:
                         raise RuntimeError("missing candidate ps needed for svg")
                     import rnaview_ps_svg
 
-                    svg_text = rnaview_ps_svg.svg_from_ps(ps_path.read_text(encoding="utf-8", errors="replace"))
+                    svg_text = rnaview_ps_svg.svg_from_ps(ps_src.read_text(encoding="utf-8", errors="replace"))
                     svg_path = case_dir / "candidate.svg"
                     svg_path.write_text(svg_text, encoding="utf-8")
                     produced_map["svg"] = svg_path
                 if "gltf" in formats:
-                    if wrl_path is None:
+                    wrl_src = produced_map.get("wrl")
+                    if wrl_src is None:
                         raise RuntimeError("missing candidate wrl needed for gltf")
                     import rnaview_vrml_gltf
 
                     gltf_text = rnaview_vrml_gltf.gltf_from_vrml(
-                        wrl_path.read_text(encoding="utf-8", errors="replace")
+                        wrl_src.read_text(encoding="utf-8", errors="replace")
                     )
                     gltf_path = case_dir / "candidate.gltf"
                     gltf_path.write_text(gltf_text, encoding="utf-8")
@@ -763,6 +789,7 @@ def _cmd_compare(args: argparse.Namespace) -> int:
                 events: list[dict[str, Any]] = []
                 diffs_by_fmt: dict[str, list[str]] = {}
                 unapproved_ids: list[str] = []
+                golden_written: set[str] = set()
 
                 for fmt in formats:
                     renderer_version_fmt = renderer_version
@@ -779,6 +806,9 @@ def _cmd_compare(args: argparse.Namespace) -> int:
                         raise RuntimeError(f"missing golden: {golden_gz}")
                     golden_canon = _gzip_read(golden_path)
                     golden_sha = _sha256_bytes(golden_canon)
+                    if str(args.emit_golden or "none") == "all" and fmt not in golden_written:
+                        _maybe_write_bytes(case_dir / f"golden.{fmt}", golden_canon)
+                        golden_written.add(fmt)
 
                     src = produced_map.get(fmt)
                     if src is None:
@@ -793,6 +823,9 @@ def _cmd_compare(args: argparse.Namespace) -> int:
                         ev = {"id": ident, "format": fmt, "change": "missing", "payload": payload}
                         ev["approved"] = ident in approved
                         events.append(ev)
+                        if str(args.emit_golden or "none") == "on-diff" and fmt not in golden_written:
+                            _maybe_write_bytes(case_dir / f"golden.{fmt}", golden_canon)
+                            golden_written.add(fmt)
                         if not ev["approved"]:
                             unapproved_ids.append(ident)
                         continue
@@ -834,6 +867,9 @@ def _cmd_compare(args: argparse.Namespace) -> int:
                     }
                     ev["approved"] = ident in approved
                     events.append(ev)
+                    if str(args.emit_golden or "none") == "on-diff" and fmt not in golden_written:
+                        _maybe_write_bytes(case_dir / f"golden.{fmt}", golden_canon)
+                        golden_written.add(fmt)
                     if not ev["approved"]:
                         unapproved_ids.append(ident)
 
@@ -938,6 +974,11 @@ def main(argv: list[str] | None = None) -> int:
     p_cmp.add_argument("--out-dir", default=None, help="Where to write the Gate D report (default: out_phase4_gate_d)")
     p_cmp.add_argument("--golden-dir", default=None, help="Golden dir (default: test/golden_render)")
     p_cmp.add_argument("--manifest", default=None, help="Golden manifest path (default: <golden_dir>/manifest.json)")
+    p_cmp.add_argument(
+        "--formats",
+        default=None,
+        help="Comma-separated formats to compare (subset of manifest formats; default: all in manifest)",
+    )
     p_cmp.add_argument("--allowlist", default=None, help="Allowlist path (default: test/gate_d_allowlist.yaml)")
     p_cmp.add_argument("--rnaview-bin", default=None, help="Legacy rnaview binary for candidate run (default: bin/rnaview)")
     p_cmp.add_argument(
@@ -961,6 +1002,12 @@ def main(argv: list[str] | None = None) -> int:
         "--renderer-version",
         default="dev",
         help="Renderer version label to include in diff event ids (default: dev)",
+    )
+    p_cmp.add_argument(
+        "--emit-golden",
+        choices=["none", "on-diff", "all"],
+        default="none",
+        help="Write golden canonical outputs into case dirs (default: none)",
     )
     p_cmp.add_argument("--max-diff-lines", type=int, default=200, help="Max unified diff lines per format")
     p_cmp.set_defaults(func=_cmd_compare)

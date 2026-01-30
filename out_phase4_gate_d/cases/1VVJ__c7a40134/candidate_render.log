@@ -4113,7 +4113,7 @@ pair-type 3917 9171 9174 WHt
   Loop 175 is from residue 9008 to residue 9014.
   Loop 176 is from residue 9046 to residue 9047.
   Loop 177 is from residue 9125 to r
-JOB finished! Time used: 32.39 seconds
+JOB finished! Time used: 16.92 seconds
 esidue 9128.
   Loop 178 is from residue 9172 to residue 9173.
   Number of Helix = 306; The longest is number 22
@@ -4127,6 +4127,4 @@ Number of single strand:   973
 
 2D structure (PS) finished! see output file: 1VVJ.cif.ps
 
-3D structure (VRML) finished! see output file: 1VVJ.cif.wrl
-
-Time used: 32.39 seconds
+Time used: 16.92 seconds

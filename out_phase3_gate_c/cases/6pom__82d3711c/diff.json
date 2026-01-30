@@ -3,7 +3,7 @@
     "unapproved_ids": []
   },
   "baseline": {
-    "elapsed_ms": 274,
+    "elapsed_ms": 282,
     "log": "out_phase3_gate_c/cases/6pom__82d3711c/legacy-v1/rust.log",
     "options": {
       "engine": "rust",

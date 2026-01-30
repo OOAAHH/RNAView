@@ -139,7 +139,7 @@ pair-type  128  206  209 SHt
 pair-type  129  207  304 WWt
 pair-type  130  209  306 SSt
 pair-type  131
-JOB finished! Time used: 0.12 seconds
+JOB finished! Time used: 0.10 seconds
   221  231 ++c
 pair-type  132  222  230 ++c
 pair-type  133  224  244 HWt
@@ -179,6 +179,4 @@ Number of single strand:   35
 
 2D structure (PS) finished! see output file: urx053.pdb.ps
 
-3D structure (VRML) finished! see output file: urx053.pdb_new.wrl
-
-Time used: 0.12 seconds
+Time used: 0.10 seconds

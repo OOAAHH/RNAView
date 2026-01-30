@@ -9,10 +9,14 @@ mod semantics;
 mod legacy_alg;
 mod noc_engine;
 mod legacy_pairing;
+mod vrml_render;
+mod render_2d;
 #[cfg(feature = "legacy-ffi")]
 mod legacy_ffi;
 pub use structure::{parse_structure_bases, BaseResidue};
 pub use out_full::{parse_out_full, write_out_full, OutEol, OutFull, OutBasePairLine, OutPairKind};
+pub use vrml_render::render_vrml_from_pairs_json;
+pub use render_2d::render_2d_from_pairs_json;
 pub use semantics::{
     ChainIdPolicy, HydrogenPolicy, MissingInsertionCodePolicy, Policies, Semantics, SemanticsConfig,
     StructurePolicies,
@@ -88,6 +92,10 @@ pub struct BasePair {
     pub resseq_j: i32,
     pub chain_j: String,
     pub kind: String, // "pair" | "stacked" | "unknown"
+    /// 1-based ordering within the `BEGIN_base-pair` block of the `.out` text this record was derived from.
+    /// Used by renderers that must reproduce legacy output order exactly.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub out_index: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lw: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -223,6 +231,7 @@ fn parse_base_pair_line(line: &str) -> Option<BasePair> {
             resseq_j,
             chain_j,
             kind,
+            out_index: None,
             lw: None,
             orientation: None,
             syn,
@@ -241,6 +250,7 @@ fn parse_base_pair_line(line: &str) -> Option<BasePair> {
         resseq_j,
         chain_j,
         kind,
+        out_index: None,
         lw,
         orientation,
         syn,
@@ -336,16 +346,22 @@ fn base_pair_sort_key(bp: &BasePair) -> (i32, i32, &str, &str, i32, &str, &str, 
     )
 }
 
-pub fn extract_core_from_out_str(text: &str) -> Core {
+fn extract_core_from_out_str_impl(text: &str, include_out_index: bool) -> Core {
     let raw_lines: Vec<&str> = text.lines().collect();
 
     let base_pair_lines = extract_block(&raw_lines, "BEGIN_base-pair", "END_base-pair");
     let mut base_pairs: Vec<BasePair> = Vec::new();
+    let mut out_index: i32 = 0;
     for raw in base_pair_lines {
         if raw.trim().is_empty() {
             continue;
         }
+        out_index += 1;
         if let Some(parsed) = parse_base_pair_line(raw) {
+            let mut parsed = parsed;
+            if include_out_index {
+                parsed.out_index = Some(out_index);
+            }
             base_pairs.push(parsed);
         } else {
             base_pairs.push(BasePair {
@@ -358,6 +374,7 @@ pub fn extract_core_from_out_str(text: &str) -> Core {
                 resseq_j: -1,
                 chain_j: "".to_string(),
                 kind: "unknown".to_string(),
+                out_index: include_out_index.then_some(out_index),
                 lw: None,
                 orientation: None,
                 syn: None,
@@ -408,9 +425,22 @@ pub fn extract_core_from_out_str(text: &str) -> Core {
     }
 }
 
+pub fn extract_core_from_out_str(text: &str) -> Core {
+    extract_core_from_out_str_impl(text, false)
+}
+
+pub fn extract_core_from_out_str_with_out_index(text: &str) -> Core {
+    extract_core_from_out_str_impl(text, true)
+}
+
 pub fn extract_core_from_out_path(path: &Path) -> std::io::Result<Core> {
     let bytes = std::fs::read(path)?;
     Ok(extract_core_from_out_str(&String::from_utf8_lossy(&bytes)))
+}
+
+pub fn extract_core_from_out_path_with_out_index(path: &Path) -> std::io::Result<Core> {
+    let bytes = std::fs::read(path)?;
+    Ok(extract_core_from_out_str_with_out_index(&String::from_utf8_lossy(&bytes)))
 }
 
 pub fn write_out_core(core: &Core) -> String {

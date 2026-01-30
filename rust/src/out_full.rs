@@ -554,6 +554,7 @@ impl From<OutBasePairLine> for BasePair {
                 OutPairKind::Pair => "pair".to_string(),
                 OutPairKind::Stacked => "stacked".to_string(),
             },
+            out_index: None,
             lw: v.type_field.as_ref().map(|s| s.split_whitespace().next().unwrap_or("").to_string()),
             orientation: None,
             syn: Some((v.syn_i as i32) + (v.syn_j as i32)),

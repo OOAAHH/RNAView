@@ -1,5 +1,5 @@
 
-JOB finished! Time used: 0.14 seconds
+JOB finished! Time used: 0.15 seconds
 Processing a single file ...
 
 parsing (_exptl.)  ntot=3 : Row=1 : data_item=3 : loop=0
@@ -108,6 +108,4 @@ Number of single strand:   10
 
 2D structure (PS) finished! see output file: 1EFW.cif.ps
 
-3D structure (VRML) finished! see output file: 1EFW.cif.wrl
-
-Time used: 0.14 seconds
+Time used: 0.15 seconds

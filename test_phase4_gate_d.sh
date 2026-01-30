@@ -9,6 +9,8 @@ export RNAVIEW="$ROOT"
 OUT_DIR="${OUT_DIR:-out_phase4_gate_d}"
 SEMANTICS="${SEMANTICS:-legacy-v1}"
 RENDERER_VERSION="${RENDERER_VERSION:-dev}"
+EMIT_GOLDEN="${EMIT_GOLDEN:-none}"
+GATE_D_FORMATS="${GATE_D_FORMATS:-}"
 CANDIDATE_ENGINE="${CANDIDATE_ENGINE:-command}"
 CANDIDATE_CMD="${CANDIDATE_CMD:-}"
 CANDIDATE_BACKEND="${CANDIDATE_BACKEND:-}"
@@ -27,6 +29,12 @@ else
       CANDIDATE_BACKEND="rustcore-release"
     elif [[ "$CANDIDATE_CMD" == *"--backend rustcore"* ]]; then
       CANDIDATE_BACKEND="rustcore"
+    elif [[ "$CANDIDATE_CMD" == *"--backend pairs-json"* ]]; then
+      CANDIDATE_BACKEND="pairs-json"
+    elif [[ "$CANDIDATE_CMD" == *"--backend pairs-out-noc3d"* ]]; then
+      CANDIDATE_BACKEND="pairs-out-noc3d"
+    elif [[ "$CANDIDATE_CMD" == *"--backend pairs-out"* ]]; then
+      CANDIDATE_BACKEND="pairs-out"
     elif [[ "$CANDIDATE_CMD" == *"--backend legacy"* ]]; then
       CANDIDATE_BACKEND="legacy"
     fi
@@ -49,6 +57,21 @@ else
         bash "$ROOT/tools/build_rnaview_rustcore_release.sh"
       fi
       ;;
+    pairs-out)
+      if [[ ! -x "$ROOT/bin/rnaview_rustcore_release" ]]; then
+        bash "$ROOT/tools/build_rnaview_rustcore_release.sh"
+      fi
+      ;;
+    pairs-json)
+      if [[ ! -x "$ROOT/bin/rnaview_rustcore_release" ]]; then
+        bash "$ROOT/tools/build_rnaview_rustcore_release.sh"
+      fi
+      ;;
+    pairs-out-noc3d)
+      if [[ ! -x "$ROOT/bin/rnaview_rustcore_release" ]]; then
+        bash "$ROOT/tools/build_rnaview_rustcore_release.sh"
+      fi
+      ;;
     *)
       echo "unknown CANDIDATE_BACKEND: ${CANDIDATE_BACKEND}" >&2
       exit 2
@@ -62,7 +85,12 @@ cmd=(python3 tools/rnaview_gate_d.py compare \
   --allowlist test/gate_d_allowlist.yaml \
   --candidate-engine "$CANDIDATE_ENGINE" \
   --semantics "$SEMANTICS" \
-  --renderer-version "$RENDERER_VERSION")
+  --renderer-version "$RENDERER_VERSION" \
+  --emit-golden "$EMIT_GOLDEN")
+
+if [[ -n "$GATE_D_FORMATS" ]]; then
+  cmd+=(--formats "$GATE_D_FORMATS")
+fi
 
 if [[ -n "$CANDIDATE_CMD" ]]; then
   read -r -a CANDIDATE_CMD_ARR <<<"$CANDIDATE_CMD"
