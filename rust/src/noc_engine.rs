@@ -6,18 +6,18 @@ use crate::StructurePolicies;
 use std::path::Path;
 
 #[derive(Debug, Clone)]
-struct LegacyArrays {
-    num_residue: usize,
-    num_atoms: usize,
-    seidx: Vec<[usize; 3]>, // 1-based: [_, start, end]
-    atom_name: Vec<AtomName4>, // 1-based
-    xyz: Vec<[f64; 4]>,        // 1-based: [_, x, y, z]
-    chain_id: Vec<u8>,         // 1-based
-    resseq: Vec<i32>,          // 1-based
-    icode: Vec<u8>,            // 1-based
-    resname: Vec<ResName3>,    // 1-based (legacy field)
-    bseq: Vec<u8>,             // 1-based
-    ry: Vec<i32>,              // 1-based
+pub(crate) struct LegacyArrays {
+    pub(crate) num_residue: usize,
+    pub(crate) num_atoms: usize,
+    pub(crate) seidx: Vec<[usize; 3]>, // 1-based: [_, start, end]
+    pub(crate) atom_name: Vec<AtomName4>, // 1-based
+    pub(crate) xyz: Vec<[f64; 4]>,        // 1-based: [_, x, y, z]
+    pub(crate) chain_id: Vec<u8>,         // 1-based
+    pub(crate) resseq: Vec<i32>,          // 1-based
+    pub(crate) icode: Vec<u8>,            // 1-based
+    pub(crate) resname: Vec<ResName3>,    // 1-based (legacy field)
+    pub(crate) bseq: Vec<u8>,             // 1-based
+    pub(crate) ry: Vec<i32>,              // 1-based
 }
 
 fn atom_name_field_legacy(name: &str) -> AtomName4 {
@@ -47,7 +47,7 @@ fn residue_name_field_legacy(name: &str) -> ResName3 {
     ResName3([b[0], b[1], b[2]])
 }
 
-fn build_legacy_arrays(path: &Path, structure_policies: &StructurePolicies) -> std::io::Result<LegacyArrays> {
+pub(crate) fn build_legacy_arrays(path: &Path, structure_policies: &StructurePolicies) -> std::io::Result<LegacyArrays> {
     let residues = parse_structure_bases_with_atoms_with_policies(path, structure_policies)?;
     let num_residue = residues.len();
 

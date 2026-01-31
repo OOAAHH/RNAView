@@ -10,6 +10,9 @@ mod legacy_alg;
 mod noc_engine;
 mod legacy_pairing;
 mod vrml_render;
+mod legacy_2d_layout;
+mod legacy_rnaml;
+mod legacy_xml2ps;
 mod render_2d;
 #[cfg(feature = "legacy-ffi")]
 mod legacy_ffi;
