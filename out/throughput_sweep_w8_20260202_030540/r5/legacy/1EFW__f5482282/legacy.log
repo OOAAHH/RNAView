@@ -1,0 +1,95 @@
+
+JOB finished! Time used: 0.17 seconds
+Processing a single file ...
+
+parsing (_exptl.)  ntot=3 : Row=1 : data_item=3 : loop=0
+
+parsing (_atom_site.)  ntot=264012 : Row=12572 : data_item=21 : loop=1
+
+parsing (_refine.)  ntot=64 : Row=1 : data_item=64 : loop=0
+
+PDB data file name: out/throughput_sweep_w8_20260202_030540/r5/_inputs/rep003/test/mmcif/insertion_code/1EFW/1EFW.cif
+
+########################################################RNA/DNA chain_ID:  C  from residue    1 to   72
+RNA/DNA chain_ID:  D  from residue    1 to   72
+
+The backbone torsion angles are in out/throughput_sweep_w8_20260202_030540/r5/_inputs/rep003/test/mmcif/insertion_code/1EFW/1EFW.cif_torsion.out
+
+missing " N7 " atom : residue name QUO, chain C, number   34?
+missing " N7 " atom : residue name QUO, chain D, number   34?
+Finding all the base pairs...
+missing " N7 " atom in base ring atoms
+missing " N7 " atom in base ring atoms
+missing " N7 " atom in base ring atoms
+missing " N7 " atom in base ring atoms
+pair-type    1    1   73 WWc
+pair-type    2    2   72 ++c
+pair-type    3    3   71 --c
+pair-type    4    3   72 WWc
+pair-type    5    4   70 WWc
+pair-type    6    5   69 ++c
+pair-type    7    6   68 ++c
+pair-type    8    7   67 ++c
+pair-type    9    8   14 WHt
+pair-type   10    9   24 HHt
+pair-type   11   10   26 WWc
+pair-type   12   10   46 HSc
+pair-type   13   11   25 --c
+pair-type   14   12   24 --c
+pair-type   15   13   23 ++c
+pair-type   16   13   24 WWc
+pair-type   17   14   22 WSc
+pair-type   18   15   49 WWt
+pair-type   19   18   56 WSt
+pair-type   20   19   57 WWc
+pair-type   21   23   47 HWt
+pair-type   22   27   45 WWc
+pair-type   23   28   44 ++c
+pair-type   24   29   43 ++c
+pair-type   25   30   42 --c
+pair-type   26   31   41 ++c
+pair-type   27   32   40 ++c
+pair-type   28   33   39 WWc
+pair-type   29   50   66 WWc
+pair-type   30   51   65 ++c
+pair-type   31   52   64 ++c
+pair-type   32   53   63 ++c
+pair-type   33   54   62 ++c
+pair-type   34   55   59 WHt
+pair-type   35   74  146 WWc
+pair-type   36   75  145 WWc
+pair-type   37   76  143 WWc
+pair-type   38   76  144 --c
+pair-type   39   77  143 WWc
+pair-type   40   78  142 ++c
+pair-type   41   79  141 ++c
+pair-type   42   80  140 ++c
+pair-type   43   81   87 WHt
+pair-type   44   82   97 HHt
+pair-type   45   83   99 WWc
+pair-type   46   83  119 HSc
+pair-type   47   84   98 --c
+pair-type   48   85   97 --c
+pair-type   49   86   96 ++c
+pair-type   50   87   95 WSc
+pair-type   51   88  122 WWt
+pair-type   52   91  129 WSt
+pair-type   53   92  130 ++c
+pair-type   54   96  120 HWt
+pair-type   55  100  118 WWc
+pair-type   56  101  117 ++c
+pair-type   57  102  116 ++c
+pair-type   58  103  115 --c
+pair-type   59  104  114 ++c
+pair-type   60  105  113 ++c
+pair-type   61  106  112 WWc
+pair-type   62  123  139 WWc
+pair-type   63  124  138 ++c
+pair-type   64  125  137 ++c
+pair-type   65  126  136 ++c
+pair-type   66  127  135 ++c
+pair-type   67  128  132 WHt
+pair-type   68  144  145 SHc
+  The total base pairs =  68 (from  146 bases);
+
+Time used: 0.17 seconds

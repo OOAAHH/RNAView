@@ -1,0 +1,28 @@
+
+JOB finished! Time used: 0.03 seconds
+Processing a single file ...
+
+parsing (_exptl.)  ntot=3 : Row=1 : data_item=3 : loop=0
+
+parsing (_atom_site.)  ntot=10478 : Row=403 : data_item=26 : loop=1
+cif table (_refine.) not found.
+the item (_refine.ls_d_res_high) is not found
+
+PDB data file name: out/throughput_sweep_release_w8_20260202_042323/r50/_inputs/rep006/test/mmcif/x-ray/3P4J/assembly-1/3p4j-assembly1.cif
+
+########################################################RNA/DNA chain_ID:  A  from residue    1 to    6
+RNA/DNA chain_ID:  B  from residue    7 to   12
+
+The backbone torsion angles are in out/throughput_sweep_release_w8_20260202_042323/r50/_inputs/rep006/test/mmcif/x-ray/3P4J/assembly-1/3p4j-assembly1.cif_torsion.out
+
+Finding all the base pairs...
+pair-type    1    1   12 ++c
+pair-type    2    2   11 ++c
+pair-type    3    3   10 ++c
+pair-type    4    4    9 ++c
+pair-type    5    5    8 ++c
+pair-type    6    6    7 ++c
+  The total base pairs =   6 (from   12 bases);
+No pattern found!
+
+Time used: 0.03 seconds

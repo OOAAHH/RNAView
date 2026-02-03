@@ -4,6 +4,8 @@
 
 规格/契约层建模（Legacy vs 新架构）见：`doc/spec.md`。
 
+架构图/流程图素材（Mermaid，可直接画图）见：`doc/architecture-diagrams.md`。
+
 ## 1. 现有项目快速审核（你现在这个仓库）
 
 ### 1.1 代码规模与构成

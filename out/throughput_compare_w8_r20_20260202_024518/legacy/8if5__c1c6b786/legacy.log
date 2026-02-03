@@ -1,0 +1,36 @@
+
+JOB finished! Time used: 0.12 seconds
+Processing a single file ...
+
+parsing (_exptl.)  ntot=10 : Row=1 : data_item=10 : loop=0
+
+parsing (_pdbx_nmr_representative.)  ntot=3 : Row=1 : data_item=3 : loop=0
+
+parsing (_pdbx_nmr_ensemble.)  ntot=15 : Row=1 : data_item=15 : loop=0
+
+parsing (_atom_site.)  ntot=180390 : Row=8590 : data_item=21 : loop=1
+cif table (_refine.) not found.
+the item (_refine.ls_d_res_high) is not found
+
+PDB data file name: out/throughput_compare_w8_r20_20260202_024518/_inputs/rep011/test/mmcif/nmr_structure/8if5/8if5.cif
+
+########################################################RNA/DNA chain_ID:  A  from residue    1 to   26
+
+The backbone torsion angles are in out/throughput_compare_w8_r20_20260202_024518/_inputs/rep011/test/mmcif/nmr_structure/8if5/8if5.cif_torsion.out
+
+Finding all the base pairs...
+pair-type    1    1   26 ++c
+pair-type    2    2   25 --c
+pair-type    3    3   24 ++c
+pair-type    4    4   23 ++c
+pair-type    5    5   22 WWc
+pair-type    6    7    9 SSc
+pair-type    7    7   15 WWt
+pair-type    8    9   15 ++c
+pair-type    9   10   11 SHc
+pair-type   10   11   19 ++c
+pair-type   11   12   13 SHc
+pair-type   12   13   17 ++c
+  The total base pairs =  12 (from   26 bases);
+
+Time used: 0.12 seconds

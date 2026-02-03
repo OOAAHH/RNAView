@@ -1,0 +1,26 @@
+{
+  "counts": {
+    "failed": 0,
+    "ok": 1,
+    "regress_failed": 0,
+    "skipped": 0
+  },
+  "elapsed_ms": 157,
+  "results": [
+    {
+      "elapsed_ms": 150,
+      "engine": "rust",
+      "error": null,
+      "input": "/workspaces/RNAView/test/pdb/tr0001/tr0001.pdb",
+      "job_dir": "/workspaces/RNAView/out/_throughput_smoke_rust_bin/tr0001__561f5292",
+      "job_id": "tr0001__561f5292",
+      "legacy_out": null,
+      "out_path": "/workspaces/RNAView/out/_throughput_smoke_rust_bin/tr0001__561f5292/engine.out",
+      "pairs_json": "/workspaces/RNAView/out/_throughput_smoke_rust_bin/tr0001__561f5292/pairs.json",
+      "regress_diffs": null,
+      "regress_ok": null,
+      "status": "ok"
+    }
+  ],
+  "schema_version": 1
+}

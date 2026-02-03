@@ -1,0 +1,19 @@
+
+JOB finished! Time used: 0.03 seconds
+Processing a single file ...
+
+PDB data file name: out/throughput_sweep_release_w8_20260202_042323/r50/_inputs/rep000/test/pdb/test1/test1.pdb_new
+
+########################################################RNA/DNA chain_ID:  A  from residue  948 to  981
+
+The backbone torsion angles are in out/throughput_sweep_release_w8_20260202_042323/r50/_inputs/rep000/test/pdb/test1/test1.pdb_new_torsion.out
+
+Finding all the base pairs...
+pair-type    1    4   23 Ssc
+pair-type    2    9   13 WWt
+pair-type    3   15   26 ++c
+pair-type    4   16   25 ++c
+  The total base pairs =   4 (from   34 bases);
+No pattern found!
+
+Time used: 0.03 seconds

@@ -920,11 +920,17 @@ def _cmd_run(args: argparse.Namespace) -> int:
 
     rust_bin: Path | None = None
     if engine == "rust":
-        try:
-            rust_bin = _ensure_rust_hotcore_binary(repo)
-        except Exception as e:  # noqa: BLE001
-            sys.stderr.write(str(e) + "\n")
-            return 3
+        if args.rust_bin:
+            rust_bin = Path(args.rust_bin).resolve()
+            if not (rust_bin.exists() and os.access(rust_bin, os.X_OK)):
+                sys.stderr.write(f"missing rust engine binary: {rust_bin}\n")
+                return 2
+        else:
+            try:
+                rust_bin = _ensure_rust_hotcore_binary(repo)
+            except Exception as e:  # noqa: BLE001
+                sys.stderr.write(str(e) + "\n")
+                return 3
 
     started = time.time()
 
@@ -1025,6 +1031,11 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) // 2), help="Parallel workers")
     run.add_argument("--engine", choices=["legacy", "rust"], default="legacy", help="Which engine to run")
     run.add_argument("--rnaview-bin", default=None, help="Path to rnaview binary (default: bin/rnaview)")
+    run.add_argument(
+        "--rust-bin",
+        default=None,
+        help="Path to rust engine binary rnaview-hotcore (default: rust/target/(release|debug)/rnaview-hotcore; auto-build if needed)",
+    )
     run.add_argument(
         "--mmcif-parser",
         choices=["legacy", "pdbtbx"],
