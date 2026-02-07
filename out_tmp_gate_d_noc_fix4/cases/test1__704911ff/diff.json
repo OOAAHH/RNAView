@@ -1,0 +1,73 @@
+{
+  "events": [
+    {
+      "approved": false,
+      "change": "changed",
+      "diff": [
+        "--- test/golden_render/pdb/test1/test1.pdb.ps.canon.gz",
+        "+++ out_tmp_gate_d_noc_fix4/cases/test1__704911ff/candidate.ps",
+        "@@ -79,8 +79,7 @@",
+        " 18.45 207.33  moveto (U) center show",
+        " 18.45 189.83  moveto (A) center show",
+        " 18.45 172.33  moveto (A) center show",
+        "-/center{dup stringwidth pop 2 div neg 0 rmoveto } bind def",
+        "-gsave Al 18.45 154.83  moveto (U) center show grestore",
+        "+18.45 154.83  moveto (U) center show",
+        " 18.45 137.33  moveto (U) center show",
+        " 18.45 119.83  moveto (C) center show",
+        " 18.45 90.66  moveto (G) center show",
+        "@@ -91,8 +90,7 @@",
+        " 68.14 -4.00  moveto (A) center show",
+        " 93.26 11.19  moveto (A) center show",
+        " 106.91 37.19  moveto (C) center show",
+        "-/center{dup stringwidth pop 2 div neg 0 rmoveto } bind def",
+        "-gsave Al 105.13 66.50  moveto (G) center show grestore",
+        "+105.13 66.50  moveto (G) center show",
+        " 88.45 90.66  moveto (C) center show",
+        " 88.45 119.83  moveto (G) center show",
+        " 88.45 137.33  moveto (A) center show"
+      ],
+      "format": "ps",
+      "id": "test/pdb/test1/test1.pdb|render:ps|legacy-v1|dev|15c2beb4ab49347b",
+      "payload": {
+        "candidate_sha256": "1f10187feb4f9c89a5644811e3f5c93c67858ab371f939d2f06c4145c5747d77",
+        "change": "changed",
+        "golden_sha256": "d3369ef4ee64bae0aec0a76cc557e90bdc264d03e29b9a59eb53573d23d8908a"
+      }
+    },
+    {
+      "approved": false,
+      "change": "changed",
+      "diff": [
+        "--- test/golden_render/pdb/test1/test1.pdb.svg.canon.gz",
+        "+++ out_tmp_gate_d_noc_fix4/cases/test1__704911ff/candidate.svg",
+        "@@ -12,7 +12,7 @@",
+        "   <text x=\"38.45\" y=\"181.67\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">U</text>",
+        "   <text x=\"38.45\" y=\"199.17\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">A</text>",
+        "   <text x=\"38.45\" y=\"216.67\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">A</text>",
+        "-  <text x=\"38.45\" y=\"234.17\" fill=\"#ff0000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">U</text>",
+        "+  <text x=\"38.45\" y=\"234.17\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">U</text>",
+        "   <text x=\"38.45\" y=\"251.67\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">U</text>",
+        "   <text x=\"38.45\" y=\"269.17\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">C</text>",
+        "   <text x=\"38.45\" y=\"298.34\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">G</text>",
+        "@@ -23,7 +23,7 @@",
+        "   <text x=\"88.14\" y=\"393.00\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">A</text>",
+        "   <text x=\"113.26\" y=\"377.81\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">A</text>",
+        "   <text x=\"126.91\" y=\"351.81\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">C</text>",
+        "-  <text x=\"125.13\" y=\"322.50\" fill=\"#ff0000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">G</text>",
+        "+  <text x=\"125.13\" y=\"322.50\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">G</text>",
+        "   <text x=\"108.45\" y=\"298.34\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">C</text>",
+        "   <text x=\"108.45\" y=\"269.17\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">G</text>",
+        "   <text x=\"108.45\" y=\"251.67\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">A</text>"
+      ],
+      "format": "svg",
+      "id": "test/pdb/test1/test1.pdb|render:svg|legacy-v1|dev+ps-svg-v1|13f9c5c3864df9df",
+      "payload": {
+        "candidate_sha256": "3f9b1cd65745dc122d0f49211d999b058f5b6fe4a713557ca71442d31695863e",
+        "change": "changed",
+        "golden_sha256": "1ee395c6a295fccb55f3923b0ba821e555db758584cdeb7c93f505a2b3963df5"
+      }
+    }
+  ],
+  "schema_version": 1
+}

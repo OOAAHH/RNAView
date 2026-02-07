@@ -3,6 +3,7 @@
 本文是“规格/契约（spec）层”的建模：描述系统**做什么**、输入输出**是什么**、一致性**如何判定**、模块边界**如何划分**。不追求贴近某种实现细节，目的是让团队在重构/替换时有共同语言与验收口径。
 
 架构图/流程图素材（Mermaid，可直接画图）见：`doc/architecture-diagrams.md`。
+交付/发布视角的里程碑与当前完成度（基于实测）见：`doc/delivery-plan.md`。
 
 ## 0. 目标与非目标
 
@@ -424,7 +425,10 @@ Gate D 的目标是把渲染产物纳入与 Phase 2/3 同等级别的回归体�
 - 冻结（生成 canonical goldens）：`python3 tools/rnaview_gate_d.py freeze`（默认输出到 `test/golden_render/manifest.json`）
 - 对比（生成报告与 diff 事件）：`python3 tools/rnaview_gate_d.py compare --out-dir out_phase4_gate_d`
   - candidate renderer（默认）：`python3 tools/rnaview_render.py render`（可用 `--candidate-cmd ...` 替换成 Rust/新渲染端；或用 `--candidate-engine legacy` 强制直接跑 legacy；注意 `--candidate-cmd` 需要放在命令行最后）
-  - new-renderer→golden（推荐入口）：`CANDIDATE_BACKEND=pairs-out bash test_phase4_gate_d.sh`（或 `rustcore-release`/`rustcore`）
+  - new-renderer→golden（推荐入口）：
+    - **过渡**（当前 CI 用法；3D No‑C，2D 仍走 C 渲染）：`CANDIDATE_BACKEND=pairs-out-noc3d bash test_phase4_gate_d.sh`
+    - **目标**（2D+3D 渲染彻底 No‑C；待实现）：`CANDIDATE_BACKEND=pairs-out-noc bash test_phase4_gate_d.sh`
+    - 其他 bridge/backend：`rustcore-release`/`rustcore`/`pairs-out`
   - 视觉 sanity（人工）：对少量代表 case，把 legacy `*.ps` 与 `out_phase4_gate_d/cases/*/candidate.svg` 并排打开确认“画得对”。Gate D 会在每个 case 下保留 `candidate.ps/xml/wrl/svg/gltf`；若想同时落盘 golden（canonical），可用 `python3 tools/rnaview_gate_d.py compare --emit-golden all`；若需要一份干净的 raw legacy 输出用于对照，可用 `python3 tools/rnaview_render.py render --backend legacy --input <file> --out-dir out_legacy_render --formats ps,xml,wrl`。
 
 allowlist：

@@ -1,5 +1,5 @@
 
-JOB finished! Time used: 0.02 seconds
+JOB finished! Time used: 0.03 seconds
 Processing a single file ...
 
 parsing (_exptl.)  ntot=3 : Row=1 : data_item=3 : loop=0
@@ -35,4 +35,4 @@ Number of single strand:   0
 
 2D structure (PS) finished! see output file: 3p4j-assembly1.cif.ps
 
-Time used: 0.02 seconds
+Time used: 0.03 seconds

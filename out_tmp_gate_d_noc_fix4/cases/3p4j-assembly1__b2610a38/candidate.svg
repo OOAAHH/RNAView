@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 110.00 186.00">
+  <text x="90.00" y="24.17" fill="#000000" font-family="Times-Bold" font-size="13.00" text-anchor="middle" dominant-baseline="middle">C</text>
+  <text x="90.00" y="53.33" fill="#000000" font-family="Times-Bold" font-size="13.00" text-anchor="middle" dominant-baseline="middle">G</text>
+  <text x="90.00" y="82.50" fill="#000000" font-family="Times-Bold" font-size="13.00" text-anchor="middle" dominant-baseline="middle">C</text>
+  <text x="90.00" y="111.67" fill="#000000" font-family="Times-Bold" font-size="13.00" text-anchor="middle" dominant-baseline="middle">G</text>
+  <text x="90.00" y="140.83" fill="#000000" font-family="Times-Bold" font-size="13.00" text-anchor="middle" dominant-baseline="middle">C</text>
+  <text x="90.00" y="170.00" fill="#000000" font-family="Times-Bold" font-size="13.00" text-anchor="middle" dominant-baseline="middle">G</text>
+  <text x="20.00" y="170.00" fill="#000000" font-family="Times-Bold" font-size="13.00" text-anchor="middle" dominant-baseline="middle">C</text>
+  <text x="20.00" y="140.83" fill="#000000" font-family="Times-Bold" font-size="13.00" text-anchor="middle" dominant-baseline="middle">G</text>
+  <text x="20.00" y="111.67" fill="#000000" font-family="Times-Bold" font-size="13.00" text-anchor="middle" dominant-baseline="middle">C</text>
+  <text x="20.00" y="82.50" fill="#000000" font-family="Times-Bold" font-size="13.00" text-anchor="middle" dominant-baseline="middle">G</text>
+  <text x="20.00" y="53.33" fill="#000000" font-family="Times-Bold" font-size="13.00" text-anchor="middle" dominant-baseline="middle">C</text>
+  <text x="20.00" y="24.17" fill="#000000" font-family="Times-Bold" font-size="13.00" text-anchor="middle" dominant-baseline="middle">G</text>
+  <text x="90.00" y="14.17" fill="#ff0000" font-family="Times" font-size="11.00" text-anchor="middle" dominant-baseline="middle">5&apos;</text>
+  <text x="90.00" y="180.00" fill="#ff0000" font-family="Times" font-size="11.00" text-anchor="middle" dominant-baseline="middle">3&apos;</text>
+  <line x1="90.00" y1="20.17" x2="90.00" y2="49.33" stroke="#009100" stroke-width="0.005" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+  <line x1="90.00" y1="49.33" x2="90.00" y2="78.50" stroke="#009100" stroke-width="0.005" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+  <line x1="90.00" y1="78.50" x2="90.00" y2="107.67" stroke="#009100" stroke-width="0.005" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+  <line x1="90.00" y1="107.67" x2="90.00" y2="136.83" stroke="#009100" stroke-width="0.005" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+  <line x1="90.00" y1="136.83" x2="90.00" y2="166.00" stroke="#009100" stroke-width="0.005" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+  <text x="20.00" y="180.00" fill="#ff0000" font-family="Times" font-size="11.00" text-anchor="middle" dominant-baseline="middle">5&apos;</text>
+  <text x="20.00" y="14.17" fill="#ff0000" font-family="Times" font-size="11.00" text-anchor="middle" dominant-baseline="middle">3&apos;</text>
+  <line x1="20.00" y1="166.00" x2="20.00" y2="136.83" stroke="#0000ff" stroke-width="0.005" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+  <line x1="20.00" y1="136.83" x2="20.00" y2="107.67" stroke="#0000ff" stroke-width="0.005" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+  <line x1="20.00" y1="107.67" x2="20.00" y2="78.50" stroke="#0000ff" stroke-width="0.005" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+  <line x1="20.00" y1="78.50" x2="20.00" y2="49.33" stroke="#0000ff" stroke-width="0.005" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+  <line x1="20.00" y1="49.33" x2="20.00" y2="20.17" stroke="#0000ff" stroke-width="0.005" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+  <text x="11.00" y="82.50" fill="#0000ff" font-family="Times" font-size="8.00" text-anchor="middle" dominant-baseline="middle">10</text>
+  <text x="99.00" y="140.83" fill="#0000ff" font-family="Times" font-size="8.00" text-anchor="middle" dominant-baseline="middle">5</text>
+  <line x1="82.00" y1="22.17" x2="28.00" y2="22.17" stroke="#000000" stroke-width="1.000" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+  <line x1="82.00" y1="18.17" x2="28.00" y2="18.17" stroke="#000000" stroke-width="1.000" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+  <line x1="82.00" y1="51.33" x2="28.00" y2="51.33" stroke="#000000" stroke-width="1.000" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+  <line x1="82.00" y1="47.33" x2="28.00" y2="47.33" stroke="#000000" stroke-width="1.000" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+  <line x1="82.00" y1="80.50" x2="28.00" y2="80.50" stroke="#000000" stroke-width="1.000" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+  <line x1="82.00" y1="76.50" x2="28.00" y2="76.50" stroke="#000000" stroke-width="1.000" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+  <line x1="82.00" y1="109.67" x2="28.00" y2="109.67" stroke="#000000" stroke-width="1.000" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+  <line x1="82.00" y1="105.67" x2="28.00" y2="105.67" stroke="#000000" stroke-width="1.000" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+  <line x1="82.00" y1="138.83" x2="28.00" y2="138.83" stroke="#000000" stroke-width="1.000" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+  <line x1="82.00" y1="134.83" x2="28.00" y2="134.83" stroke="#000000" stroke-width="1.000" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+  <line x1="82.00" y1="168.00" x2="28.00" y2="168.00" stroke="#000000" stroke-width="1.000" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+  <line x1="82.00" y1="164.00" x2="28.00" y2="164.00" stroke="#000000" stroke-width="1.000" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+</svg>

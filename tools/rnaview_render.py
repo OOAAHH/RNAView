@@ -18,6 +18,7 @@ _BACKEND_VERSIONS = {
     "pairs-out": "pairs-out-shell-v1",
     "pairs-json": "pairs-json-shell-v1",
     "pairs-out-noc3d": "pairs-out-noc3d-shell-v1",
+    "pairs-out-noc": "pairs-out-noc-shell-v1",
 }
 
 
@@ -68,6 +69,18 @@ def _find_rust_hotcore_binary(repo: Path) -> Path | None:
     return None
 
 
+def _find_rust_hotcore_binaries(repo: Path) -> list[Path]:
+    candidates = [
+        repo / "rust" / "target" / "release" / "rnaview-hotcore",
+        repo / "rust" / "target" / "debug" / "rnaview-hotcore",
+    ]
+    out: list[Path] = []
+    for p in candidates:
+        if p.exists() and os.access(p, os.X_OK):
+            out.append(p)
+    return out
+
+
 def _rust_hotcore_needs_rebuild(repo: Path, binary: Path) -> bool:
     try:
         bin_mtime = binary.stat().st_mtime
@@ -93,9 +106,10 @@ def _rust_hotcore_needs_rebuild(repo: Path, binary: Path) -> bool:
 
 
 def _ensure_rust_hotcore_binary(repo: Path) -> Path:
-    found = _find_rust_hotcore_binary(repo)
-    if found is not None and not _rust_hotcore_needs_rebuild(repo, found):
-        return found
+    # Prefer an up-to-date binary (release first, then debug).
+    for p in _find_rust_hotcore_binaries(repo):
+        if not _rust_hotcore_needs_rebuild(repo, p):
+            return p
 
     cargo = shutil.which("cargo")
     if cargo is None:
@@ -112,10 +126,14 @@ def _ensure_rust_hotcore_binary(repo: Path) -> Path:
     if proc.returncode != 0:
         raise RuntimeError(f"failed to build rust engine (code={proc.returncode}):\n{proc.stdout}")
 
+    # After building, prefer an up-to-date binary (release if it was built, otherwise debug).
+    for p in _find_rust_hotcore_binaries(repo):
+        if not _rust_hotcore_needs_rebuild(repo, p):
+            return p
     found = _find_rust_hotcore_binary(repo)
     if found is None:
         raise RuntimeError("rust engine build succeeded but binary not found under rust/target/(debug|release)")
-    return found
+    raise RuntimeError(f"rust engine build did not produce an up-to-date binary; found={found}")
 
 
 def _run_rust_out(
@@ -199,6 +217,46 @@ def _run_rust_wrl(
         raise RuntimeError(f"rust wrl render failed (code={proc.returncode}); see {log_path}")
     if not out_wrl_path.exists():
         raise RuntimeError(f"rust wrl render produced no .wrl: {out_wrl_path}")
+
+
+def _run_rust_2d(
+    *,
+    repo: Path,
+    pairs_path: Path,
+    source_path: Path,
+    out_xml_path: Path | None,
+    out_ps_path: Path | None,
+    log_path: Path,
+) -> None:
+    if out_xml_path is None and out_ps_path is None:
+        return
+
+    rust_bin = _ensure_rust_hotcore_binary(repo)
+    env = dict(os.environ)
+    env["RNAVIEW"] = str(repo)
+    env.update(_sysroot_env())
+
+    cmd = [
+        str(rust_bin),
+        "render-2d",
+        str(pairs_path),
+        "--source",
+        str(source_path),
+    ]
+    if out_xml_path is not None:
+        cmd += ["--out-xml", str(out_xml_path)]
+    if out_ps_path is not None:
+        cmd += ["--out-ps", str(out_ps_path)]
+
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("wb") as log:
+        proc = subprocess.run(cmd, cwd=str(repo), env=env, stdout=log, stderr=subprocess.STDOUT, check=False)
+    if proc.returncode != 0:
+        raise RuntimeError(f"rust 2d render failed (code={proc.returncode}); see {log_path}")
+    if out_xml_path is not None and not out_xml_path.exists():
+        raise RuntimeError(f"rust 2d render produced no .xml: {out_xml_path}")
+    if out_ps_path is not None and not out_ps_path.exists():
+        raise RuntimeError(f"rust 2d render produced no .ps: {out_ps_path}")
 
 
 def _run_cli_render(
@@ -292,23 +350,25 @@ def _cmd_render(args: argparse.Namespace) -> int:
     if backend not in _BACKEND_VERSIONS:
         raise RuntimeError(f"unsupported backend: {backend} (supported: {sorted(_BACKEND_VERSIONS)})")
 
+    renderer_bin: Path | None = None
     if args.rnaview_bin:
+        if backend == "pairs-out-noc":
+            raise RuntimeError("pairs-out-noc does not use --rnaview-bin (it uses the Rust hotcore CLI)")
         renderer_bin = Path(args.rnaview_bin).resolve()
+    elif backend == "legacy":
+        renderer_bin = (repo / "bin" / "rnaview").resolve()
+    elif backend == "rustcore":
+        renderer_bin = (repo / "bin" / "rnaview_rustcore").resolve()
+    elif backend == "rustcore-release":
+        renderer_bin = (repo / "bin" / "rnaview_rustcore_release").resolve()
+    elif backend in ("pairs-out", "pairs-out-noc3d", "pairs-json"):
+        renderer_bin = (repo / "bin" / "rnaview_rustcore_release").resolve()
+    elif backend == "pairs-out-noc":
+        renderer_bin = None
     else:
-        if backend == "legacy":
-            renderer_bin = (repo / "bin" / "rnaview").resolve()
-        elif backend == "rustcore":
-            renderer_bin = (repo / "bin" / "rnaview_rustcore").resolve()
-        elif backend == "rustcore-release":
-            renderer_bin = (repo / "bin" / "rnaview_rustcore_release").resolve()
-        elif backend in ("pairs-out", "pairs-out-noc3d"):
-            renderer_bin = (repo / "bin" / "rnaview_rustcore_release").resolve()
-        elif backend == "pairs-json":
-            renderer_bin = (repo / "bin" / "rnaview_rustcore_release").resolve()
-        else:
-            raise RuntimeError(f"unsupported backend: {backend}")
+        raise RuntimeError(f"unsupported backend: {backend}")
 
-    if not (renderer_bin.exists() and os.access(renderer_bin, os.X_OK)):
+    if renderer_bin is not None and not (renderer_bin.exists() and os.access(renderer_bin, os.X_OK)):
         if backend == "legacy":
             build = repo / "tools" / "build_legacy_rnaview.sh"
         elif backend == "rustcore":
@@ -323,7 +383,7 @@ def _cmd_render(args: argparse.Namespace) -> int:
     want_wrl = "wrl" in requested_formats
 
     out_override_path: Path | None = None
-    if backend in ("pairs-out", "pairs-out-noc3d", "pairs-json"):
+    if backend in ("pairs-out", "pairs-out-noc3d", "pairs-out-noc", "pairs-json"):
         pairs_path = out_dir / "pairs.json"
         out_path = out_dir / "engine.out"
         rust_log = out_dir / "rust_engine.log"
@@ -336,6 +396,66 @@ def _cmd_render(args: argparse.Namespace) -> int:
             out_path=out_path,
         )
         out_override_path = out_path
+
+    if backend == "pairs-out-noc":
+        outputs: dict[str, Path] = {}
+        pairs_path = out_dir / "pairs.json"
+
+        out_xml_path = out_dir / f"{input_path.name}.xml" if "xml" in requested_formats else None
+        out_ps_path = out_dir / f"{input_path.name}.ps" if "ps" in requested_formats else None
+        rust_2d_log = out_dir / "rust_2d.log"
+        _run_rust_2d(
+            repo=repo,
+            pairs_path=pairs_path,
+            source_path=input_path,
+            out_xml_path=out_xml_path,
+            out_ps_path=out_ps_path,
+            log_path=rust_2d_log,
+        )
+        if out_xml_path is not None:
+            outputs["xml"] = out_xml_path
+        if out_ps_path is not None:
+            outputs["ps"] = out_ps_path
+
+        if want_wrl:
+            out_wrl_path = out_dir / f"{input_path.name}.wrl"
+            wrl_log = out_dir / "rust_wrl.log"
+            _run_rust_wrl(
+                repo=repo,
+                pairs_path=pairs_path,
+                source_path=input_path,
+                out_wrl_path=out_wrl_path,
+                log_path=wrl_log,
+            )
+            outputs["wrl"] = out_wrl_path
+
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_lines = [
+            "pairs-out-noc",
+            f"- rust_engine: {out_dir / 'rust_engine.log'}",
+        ]
+        if out_xml_path is not None or out_ps_path is not None:
+            log_lines.append(f"- rust_2d: {rust_2d_log}")
+        if want_wrl:
+            log_lines.append(f"- rust_wrl: {out_dir / 'rust_wrl.log'}")
+        log_path.write_text("\n".join(log_lines) + "\n", encoding="utf-8")
+
+        missing = [f for f in requested_formats if f not in outputs]
+        if missing:
+            raise RuntimeError(f"render missing outputs: {missing} (see {log_path})")
+
+        sys.stdout.write(
+            _json_dumps(
+                {
+                    "schema_version": 1,
+                    "status": "ok",
+                    "renderer_version": _BACKEND_VERSIONS[backend],
+                    "outputs": {k: str(v) for k, v in sorted(outputs.items())},
+                    "log": str(log_path),
+                }
+            )
+        )
+        return 0
 
     want_wrl_cli = want_wrl
     if backend == "pairs-out-noc3d" and want_wrl:
@@ -394,7 +514,7 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument(
         "--backend",
         default="legacy",
-        help="Backend renderer (legacy|rustcore|rustcore-release|pairs-out|pairs-json|pairs-out-noc3d). Use --rnaview-bin to override the binary path.",
+        help="Backend renderer (legacy|rustcore|rustcore-release|pairs-out|pairs-json|pairs-out-noc3d|pairs-out-noc). Use --rnaview-bin to override the binary path.",
     )
     r.add_argument("--rnaview-bin", default=None, help="Renderer binary path (overrides --backend default)")
     r.add_argument("--log", default=None, help="Write renderer log here (default: <out-dir>/render.log)")

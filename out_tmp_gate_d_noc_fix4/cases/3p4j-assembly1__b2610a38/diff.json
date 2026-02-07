@@ -1,0 +1,89 @@
+{
+  "events": [
+    {
+      "approved": false,
+      "change": "changed",
+      "diff": [
+        "--- test/golden_render/mmcif/x-ray/3P4J/assembly-1/3p4j-assembly1.cif.ps.canon.gz",
+        "+++ out_tmp_gate_d_noc_fix4/cases/3p4j-assembly1__b2610a38/candidate.ps",
+        "@@ -68,23 +68,17 @@",
+        " ",
+        " /center{dup stringwidth pop 2 div neg 0 rmoveto } bind def",
+        " 70.00 141.83  moveto (C) center show",
+        "-/center{dup stringwidth pop 2 div neg 0 rmoveto } bind def",
+        "-gsave Al 70.00 112.67  moveto (G) center show grestore",
+        "+70.00 112.67  moveto (G) center show",
+        " 70.00 83.50  moveto (C) center show",
+        "-/center{dup stringwidth pop 2 div neg 0 rmoveto } bind def",
+        "-gsave Al 70.00 54.33  moveto (G) center show grestore",
+        "+70.00 54.33  moveto (G) center show",
+        " 70.00 25.17  moveto (C) center show",
+        "-/center{dup stringwidth pop 2 div neg 0 rmoveto } bind def",
+        "-gsave Al 70.00 -4.00  moveto (G) center show grestore",
+        "+70.00 -4.00  moveto (G) center show",
+        " 0.00 -4.00  moveto (C) center show",
+        "-/center{dup stringwidth pop 2 div neg 0 rmoveto } bind def",
+        "-gsave Al 0.00 25.17  moveto (G) center show grestore",
+        "+0.00 25.17  moveto (G) center show",
+        " 0.00 54.33  moveto (C) center show",
+        "-/center{dup stringwidth pop 2 div neg 0 rmoveto } bind def",
+        "-gsave Al 0.00 83.50  moveto (G) center show grestore",
+        "+0.00 83.50  moveto (G) center show",
+        " 0.00 112.67  moveto (C) center show",
+        "-/center{dup stringwidth pop 2 div neg 0 rmoveto } bind def",
+        "-gsave Al 0.00 141.83  moveto (G) center show grestore",
+        "+0.00 141.83  moveto (G) center show",
+        " 0.005 setlinewidth 1 setlinejoin 1 setlinecap",
+        " /Times findfont 11 scalefont setfont",
+        " /center{dup stringwidth pop 2 div neg 0 rmoveto } bind def"
+      ],
+      "format": "ps",
+      "id": "test/mmcif/x-ray/3P4J/assembly-1/3p4j-assembly1.cif|render:ps|legacy-v1|dev|0b796a363d667835",
+      "payload": {
+        "candidate_sha256": "d407bebbce9eff4007e429bd11f29af0fe0cbbec0805f0abca1a3161456dba68",
+        "change": "changed",
+        "golden_sha256": "f769f7488419036110efb2118e966111bc92c94de5f6e156d8b9edf0d8e4aeae"
+      }
+    },
+    {
+      "approved": false,
+      "change": "changed",
+      "diff": [
+        "--- test/golden_render/mmcif/x-ray/3P4J/assembly-1/3p4j-assembly1.cif.svg.canon.gz",
+        "+++ out_tmp_gate_d_noc_fix4/cases/3p4j-assembly1__b2610a38/candidate.svg",
+        "@@ -1,17 +1,17 @@",
+        " <?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+        " <svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" viewBox=\"0 0 110.00 186.00\">",
+        "   <text x=\"90.00\" y=\"24.17\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">C</text>",
+        "-  <text x=\"90.00\" y=\"53.33\" fill=\"#ff0000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">G</text>",
+        "+  <text x=\"90.00\" y=\"53.33\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">G</text>",
+        "   <text x=\"90.00\" y=\"82.50\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">C</text>",
+        "-  <text x=\"90.00\" y=\"111.67\" fill=\"#ff0000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">G</text>",
+        "+  <text x=\"90.00\" y=\"111.67\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">G</text>",
+        "   <text x=\"90.00\" y=\"140.83\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">C</text>",
+        "-  <text x=\"90.00\" y=\"170.00\" fill=\"#ff0000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">G</text>",
+        "+  <text x=\"90.00\" y=\"170.00\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">G</text>",
+        "   <text x=\"20.00\" y=\"170.00\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">C</text>",
+        "-  <text x=\"20.00\" y=\"140.83\" fill=\"#ff0000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">G</text>",
+        "+  <text x=\"20.00\" y=\"140.83\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">G</text>",
+        "   <text x=\"20.00\" y=\"111.67\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">C</text>",
+        "-  <text x=\"20.00\" y=\"82.50\" fill=\"#ff0000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">G</text>",
+        "+  <text x=\"20.00\" y=\"82.50\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">G</text>",
+        "   <text x=\"20.00\" y=\"53.33\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">C</text>",
+        "-  <text x=\"20.00\" y=\"24.17\" fill=\"#ff0000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">G</text>",
+        "+  <text x=\"20.00\" y=\"24.17\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">G</text>",
+        "   <text x=\"90.00\" y=\"14.17\" fill=\"#ff0000\" font-family=\"Times\" font-size=\"11.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">5&apos;</text>",
+        "   <text x=\"90.00\" y=\"180.00\" fill=\"#ff0000\" font-family=\"Times\" font-size=\"11.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">3&apos;</text>",
+        "   <line x1=\"90.00\" y1=\"20.17\" x2=\"90.00\" y2=\"49.33\" stroke=\"#009100\" stroke-width=\"0.005\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\" />"
+      ],
+      "format": "svg",
+      "id": "test/mmcif/x-ray/3P4J/assembly-1/3p4j-assembly1.cif|render:svg|legacy-v1|dev+ps-svg-v1|acd799738801a5e3",
+      "payload": {
+        "candidate_sha256": "935c216b55904d283358c801189e0f6e601cbb8e8218a957d21ecb0f339d2f0a",
+        "change": "changed",
+        "golden_sha256": "1d2e4ef2085763f13819548e7e0c02f18d4875d330b2abbb54043610b6451b1d"
+      }
+    }
+  ],
+  "schema_version": 1
+}

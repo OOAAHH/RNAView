@@ -9,3 +9,7 @@ bin/rnaview*
 obj/*
 !obj/.placeholder
 rust/target/
+
+# PyPI v0 wheel embeds this binary at build time
+rnaview/_bin/rnaview-hotcore
+dist/

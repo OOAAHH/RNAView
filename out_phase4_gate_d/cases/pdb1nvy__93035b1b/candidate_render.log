@@ -1,5 +1,5 @@
 
-JOB finished! Time used: 0.02 seconds
+JOB finished! Time used: 0.03 seconds
 Processing a single file ...
 
 PDB data file name: pdb1nvy.pdb_new
@@ -29,4 +29,4 @@ Number of single strand:   2
 
 2D structure (PS) finished! see output file: pdb1nvy.pdb.ps
 
-Time used: 0.02 seconds
+Time used: 0.03 seconds

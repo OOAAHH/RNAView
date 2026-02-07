@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rnaview"
+version = "0.0.0.dev0"
+description = "RNAView modernization (Rust hotcore + Python wrapper)"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+authors = [{ name = "RNAView Modernization" }]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["rnaview*"]
+
+[tool.setuptools.package-data]
+rnaview = ["BASEPARS/*", "_bin/*"]

@@ -1,0 +1,51 @@
+{
+  "events": [
+    {
+      "approved": false,
+      "change": "changed",
+      "diff": [
+        "--- test/golden_render/mmcif/insertion_code/1EFW/1EFW.cif.ps.canon.gz",
+        "+++ out_tmp_gate_d_noc_fix6/cases/1EFW__26f53222/candidate.ps",
+        "@@ -400,6 +400,7 @@",
+        " gsave Tl 70.84 288.70 moveto (51) center show grestore",
+        " gsave Tl 33.65 241.22 moveto (61) center show grestore",
+        " gsave Tl 59.62 145.72 moveto (12) center show grestore",
+        "+gsave Tl 26.28 80.14 moveto (26) center show grestore",
+        " gsave Tl 92.90 67.34 moveto (41) center show grestore",
+        " gsave Tl 50.59 24.37 moveto (31) center show grestore",
+        " gsave Tl 661.72 271.90 moveto (15) center show grestore"
+      ],
+      "format": "ps",
+      "id": "test/mmcif/insertion_code/1EFW/1EFW.cif|render:ps|legacy-v1|dev|f5cc2e53cd561533",
+      "payload": {
+        "candidate_sha256": "34497b80c678ec81e3ef332a77b5c754109fa8856621d14cce48d4f5e318e85e",
+        "change": "changed",
+        "golden_sha256": "db69489357fc2c45df2515de2cb5975a8c39bdee31e34cd5bd5dee4fad9a8d77"
+      }
+    },
+    {
+      "approved": false,
+      "change": "changed",
+      "diff": [
+        "--- test/golden_render/mmcif/insertion_code/1EFW/1EFW.cif.svg.canon.gz",
+        "+++ out_tmp_gate_d_noc_fix6/cases/1EFW__26f53222/candidate.svg",
+        "@@ -310,6 +310,7 @@",
+        "   <text x=\"90.84\" y=\"118.30\" fill=\"#0000ff\" font-family=\"Times\" font-size=\"8.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">51</text>",
+        "   <text x=\"53.65\" y=\"165.78\" fill=\"#0000ff\" font-family=\"Times\" font-size=\"8.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">61</text>",
+        "   <text x=\"79.62\" y=\"261.28\" fill=\"#0000ff\" font-family=\"Times\" font-size=\"8.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">12</text>",
+        "+  <text x=\"46.28\" y=\"326.86\" fill=\"#0000ff\" font-family=\"Times\" font-size=\"8.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">26</text>",
+        "   <text x=\"112.90\" y=\"339.66\" fill=\"#0000ff\" font-family=\"Times\" font-size=\"8.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">41</text>",
+        "   <text x=\"70.59\" y=\"382.63\" fill=\"#0000ff\" font-family=\"Times\" font-size=\"8.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">31</text>",
+        "   <text x=\"681.72\" y=\"135.10\" fill=\"#0000ff\" font-family=\"Times\" font-size=\"8.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">15</text>"
+      ],
+      "format": "svg",
+      "id": "test/mmcif/insertion_code/1EFW/1EFW.cif|render:svg|legacy-v1|dev+ps-svg-v1|99bea07b5e24cc8c",
+      "payload": {
+        "candidate_sha256": "574b4f9051388248f2fab7e0fdf75adc589b99aac7c97e9f179d59b638eb41b5",
+        "change": "changed",
+        "golden_sha256": "e0daf98450ff611463b68bfa7d174eec19e600fa830db70411b767af1539906a"
+      }
+    }
+  ],
+  "schema_version": 1
+}

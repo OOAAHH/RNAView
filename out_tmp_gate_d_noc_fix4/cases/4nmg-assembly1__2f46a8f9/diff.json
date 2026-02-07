@@ -1,0 +1,54 @@
+{
+  "events": [
+    {
+      "approved": false,
+      "change": "changed",
+      "diff": [
+        "--- test/golden_render/mmcif/x-ray/4NMG/assembly-1/4nmg-assembly1.cif.ps.canon.gz",
+        "+++ out_tmp_gate_d_noc_fix4/cases/4nmg-assembly1__2f46a8f9/candidate.ps",
+        "@@ -75,8 +75,7 @@",
+        " 0.00 269.56  moveto (C) center show",
+        " 0.00 240.39  moveto (U) center show",
+        " 0.00 211.22  moveto (A) center show",
+        "-/center{dup stringwidth pop 2 div neg 0 rmoveto } bind def",
+        "-gsave Al 0.00 152.89  moveto (G) center show grestore",
+        "+0.00 152.89  moveto (G) center show",
+        " 0.00 123.72  moveto (u) center show",
+        " 0.00 94.56  moveto (A) center show",
+        " 0.00 65.39  moveto (C) center show"
+      ],
+      "format": "ps",
+      "id": "test/mmcif/x-ray/4NMG/assembly-1/4nmg-assembly1.cif|render:ps|legacy-v1|dev|0e4d03078c8b9e94",
+      "payload": {
+        "candidate_sha256": "16165363cb8e74326d56bc0139ccc6bf4e90d6ef1043bbe6be2b6fe1968bcd4d",
+        "change": "changed",
+        "golden_sha256": "506ced9bb68f3f201578d4ddc9eeee7d727825ebb5d6825df889ffc18adf4966"
+      }
+    },
+    {
+      "approved": false,
+      "change": "changed",
+      "diff": [
+        "--- test/golden_render/mmcif/x-ray/4NMG/assembly-1/4nmg-assembly1.cif.svg.canon.gz",
+        "+++ out_tmp_gate_d_noc_fix4/cases/4nmg-assembly1__2f46a8f9/candidate.svg",
+        "@@ -8,7 +8,7 @@",
+        "   <text x=\"20.00\" y=\"158.44\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">C</text>",
+        "   <text x=\"20.00\" y=\"187.61\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">U</text>",
+        "   <text x=\"20.00\" y=\"216.78\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">A</text>",
+        "-  <text x=\"20.00\" y=\"275.11\" fill=\"#ff0000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">G</text>",
+        "+  <text x=\"20.00\" y=\"275.11\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">G</text>",
+        "   <text x=\"20.00\" y=\"304.28\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">u</text>",
+        "   <text x=\"20.00\" y=\"333.44\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">A</text>",
+        "   <text x=\"20.00\" y=\"362.61\" fill=\"#000000\" font-family=\"Times-Bold\" font-size=\"13.00\" text-anchor=\"middle\" dominant-baseline=\"middle\">C</text>"
+      ],
+      "format": "svg",
+      "id": "test/mmcif/x-ray/4NMG/assembly-1/4nmg-assembly1.cif|render:svg|legacy-v1|dev+ps-svg-v1|22c85a372913ee0b",
+      "payload": {
+        "candidate_sha256": "70b22b1b1c0f8817dba97a5e8ed208011b94dd8612b00578df5fa64a1d7becb8",
+        "change": "changed",
+        "golden_sha256": "2b82d5ceeeb0417ff61d45df5e48e58a73f9e3eba8076eb723bfbb34a9e15339"
+      }
+    }
+  ],
+  "schema_version": 1
+}

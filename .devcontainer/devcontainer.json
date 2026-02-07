@@ -1,5 +1,10 @@
 {
   "name": "My Local Dev Container",
   "image": "ooaahhdocker/micromambarust:1.0",
-  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}"
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "portsAttributes": {
+    "1455": {
+      "label": "1456"
+    }
+  }
 }

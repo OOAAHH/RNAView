@@ -1,0 +1,265 @@
+#VRML V2.0 utf8
+
+PROTO Label [
+  field SFVec3f p 0 0 0
+  field SFFloat sz 1.5
+  field MFString c []
+  field SFVec3f o 0 0 0
+  field SFColor dc 0 0 0
+  field SFColor ec 0 0 0
+  field SFColor sc 0.0 0.0 0.0
+  field SFFloat sh 1.0
+  field SFFloat tr 0
+]
+{
+  Transform {
+    translation IS p
+    children [
+      Billboard {
+        axisOfRotation 0 0 0
+        children [
+          Transform {
+            translation IS o
+            children [
+              Shape {
+                appearance Appearance {
+                  material Material {
+                    diffuseColor IS dc
+                    emissiveColor IS ec
+                    specularColor IS sc
+                    shininess IS sh
+                    transparency IS tr
+                  }
+                }
+                geometry Text {
+                  string IS c
+                  fontStyle FontStyle {
+                    style "BOLD"
+                    justify "MIDDLE"
+                    size IS sz
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+PROTO Sphere [
+  exposedField SFVec3f p 0 0 0
+  field SFFloat rad 1.0
+  field SFColor dc 1 0 0 
+  field SFColor ec 0 0 0
+  field SFColor sc 0 0 0
+  field SFFloat sh 1
+  field SFFloat tr 0
+]
+{
+  Transform {
+    translation IS p
+    children [
+      Shape {
+        appearance Appearance {
+          material Material {
+            diffuseColor IS dc
+            emissiveColor IS ec
+            specularColor IS sc
+            shininess IS sh
+            transparency IS tr
+          }
+        }
+        geometry Sphere {
+          radius IS rad
+        }
+      }
+    ]
+  }
+}
+PROTO Box [
+  exposedField SFVec3f p 0 0 0
+  exposedField SFRotation r 0 0 1 0
+  exposedField SFVec3f s 1 1 1
+  field SFColor dc 1 0 0 
+  field SFColor ec 0 0 0
+  field SFColor sc 0 0 0
+  field SFFloat sh 1
+  field SFFloat tr 0
+]
+{
+  Transform {
+    translation IS p
+    rotation IS r
+    scale IS s
+    children [
+      Shape {
+        appearance Appearance {
+          material Material {
+            diffuseColor IS dc
+            emissiveColor IS ec
+            specularColor IS sc
+            shininess IS sh
+            transparency IS tr
+          }
+        }
+        geometry Box { }
+      }
+    ]
+  }
+}
+PROTO Cyl [
+  exposedField SFVec3f p 0 0 0
+  exposedField SFRotation r 0 0 1 0
+  exposedField SFVec3f s 1 1 1
+  field SFColor dc 1 0 0
+  field SFColor ec 0 0 0
+  field SFColor sc 0 0 0
+  field SFFloat sh 1
+  field SFFloat tr 0
+]
+{
+  Transform {
+    translation IS p
+    rotation IS r
+    scale IS s
+    children [
+      Shape {
+        appearance Appearance {
+          material Material {
+            diffuseColor IS dc
+            emissiveColor IS ec
+            specularColor IS sc
+            shininess IS sh
+            transparency IS tr
+          }
+        }
+        geometry Cylinder { }
+      }
+    ]
+  }
+}
+PROTO Cone [
+  exposedField SFVec3f p 0 0 0
+  exposedField SFRotation r 0 0 1 0
+  exposedField SFVec3f s 1 1 1
+  field SFColor dc 1 0 0 
+  field SFColor ec 0 0 0
+  field SFColor sc 0 0 0
+  field SFFloat sh 1
+  field SFFloat tr 0
+]
+{
+  Transform {
+    translation IS p
+    rotation IS r
+    scale IS s
+    children [
+      Shape {
+        appearance Appearance {
+          material Material {
+            diffuseColor IS dc
+            emissiveColor IS ec
+            specularColor IS sc
+            shininess IS sh
+            transparency IS tr
+          }
+        }
+        geometry Cone {
+        }
+      }
+    ]
+  }
+}
+Collision {
+  collide FALSE
+  children [
+    
+    Shape {
+      appearance Appearance {
+        material Material {
+          diffuseColor 0.71 0.34 0.88
+          transparency 1
+        }
+      }
+      geometry IndexedLineSet {
+        coord Coordinate {
+          point [
+            -8.83 10.49 -51.39, -9.94 6.41 -47.16, -7.97 1.53 -44.36, -4.15 -3.22 -43.57
+            1.33 -5.49 -44.27, 7.38 -5.66 -45.83, 12.65 -2.52 -46.10
+          ]
+        }
+        coordIndex [
+          0 1 2 3 4 5 6 -1
+        ]
+        colorPerVertex FALSE
+        color Color {
+          color [
+            0.71 0.34 0.88
+          ]
+        }
+        colorIndex [
+          0
+        ]
+      }
+    }
+Label { p  -8.83 10.49 -51.39 c "  U" dc  0.000, 1.000, 1.000}
+Label { p  -9.94 6.41 -47.16 c "  A" dc  1.000, 0.000, 0.000}
+Label { p  -7.97 1.53 -44.36 c "  G" dc  0.000, 1.000, 0.000}
+Label { p  -4.15 -3.22 -43.57 c "  C" dc  0.000, 0.000, 1.000}
+Label { p  1.33 -5.49 -44.27 c "  U" dc  0.000, 1.000, 1.000}
+Label { p  7.38 -5.66 -45.83 c "  C" dc  0.000, 0.000, 1.000}
+Label { p  12.65 -2.52 -46.10 c "  C" dc  0.000, 0.000, 1.000}
+
+    Shape {
+      appearance Appearance {
+        material Material {
+          diffuseColor 1 1 0.5
+          transparency 1
+        }
+      }
+      geometry IndexedLineSet {
+        coord Coordinate {
+          point [
+            7.61 11.29 -49.89, 9.50 6.78 -53.61, 8.37 0.83 -55.45, 4.31 -3.54 -56.10
+            -0.88 -6.17 -55.11, -6.92 -6.66 -53.50, -12.46 -4.05 -53.67
+          ]
+        }
+        coordIndex [
+          0 1 2 3 4 5 6 -1
+        ]
+        colorPerVertex FALSE
+        color Color {
+          color [
+            1 1 0.5
+          ]
+        }
+        colorIndex [
+          0
+        ]
+      }
+    }
+Label { p  7.61 11.29 -49.89 c "  G" dc  0.000, 1.000, 0.000}
+Label { p  9.50 6.78 -53.61 c "  G" dc  0.000, 1.000, 0.000}
+Label { p  8.37 0.83 -55.45 c "  G" dc  0.000, 1.000, 0.000}
+Label { p  4.31 -3.54 -56.10 c "  G" dc  0.000, 1.000, 0.000}
+Label { p  -0.88 -6.17 -55.11 c "  C" dc  0.000, 0.000, 1.000}
+Label { p  -6.92 -6.66 -53.50 c "  U" dc  0.000, 1.000, 1.000}
+Label { p  -12.46 -4.05 -53.67 c "  A" dc  1.000, 0.000, 0.000}
+Cyl {p -10.65 3.22 -52.53  r  -0.53 0.00 0.85 2.86  s  0.22 6.89 0.22  tr  0.00}
+ Cyl {p -8.43 -0.13 -50.33  r  -0.90 0.00 -0.43 2.65  s  0.21 6.75 0.21  tr  0.00}
+ Cyl {p -4.42 -2.32 -49.74  r  -0.83 0.00 -0.55 2.11  s  0.21 6.82 0.21  tr  0.00}
+ Cyl {p 0.08 -3.38 -49.83  r  -0.83 0.00 -0.56 1.59  s  0.22 6.87 0.22  tr  0.00}
+ Cyl {p 4.85 -2.33 -49.86  r  -0.85 0.00 -0.53 1.12  s  0.18 6.66 0.18  tr  0.60}
+ Sphere {p 4.85 -2.33 -49.86  rad  0.98   dc 1 0 0  tr  0.00}
+ Cyl {p 8.44 0.56 -49.72  r  -0.96 0.00 -0.26 0.57  s  0.21 6.74 0.21  tr  0.00}
+ Cyl {p 10.13 4.39 -48.00  r  -0.60 0.00 0.80 0.43  s  0.22 6.90 0.22  tr  0.00}
+ 
+  ]
+}
+NavigationInfo {
+  speed 4
+  type [
+    "EXAMINE" "FLY"
+  ]
+}

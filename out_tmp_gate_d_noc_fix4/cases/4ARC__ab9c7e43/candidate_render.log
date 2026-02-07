@@ -1,0 +1,4 @@
+pairs-out-noc
+- rust_engine: /tmp/rnaview_gate_d_compare.kwdw_unk/candidate_render/rust_engine.log
+- rust_2d: /tmp/rnaview_gate_d_compare.kwdw_unk/candidate_render/rust_2d.log
+- rust_wrl: /tmp/rnaview_gate_d_compare.kwdw_unk/candidate_render/rust_wrl.log

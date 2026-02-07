@@ -6,6 +6,8 @@
 
 架构图/流程图素材（Mermaid，可直接画图）见：`doc/architecture-diagrams.md`。
 
+交付视角的 Roadmap（含当前 gate 实测状态与 PyPI/Notebook 交付规划）见：`doc/delivery-plan.md`。
+
 ## 1. 现有项目快速审核（你现在这个仓库）
 
 ### 1.1 代码规模与构成
@@ -173,7 +175,7 @@ Phase 2 有两道门槛（建议都写进里程碑）：
 
 补充（现状落地）：
 - 当前仓库已提供 Gate B 的“无 C 验收脚本”骨架：`bash test_phase2_noc.sh`。
-- 目前 Gate B 的 No-C 跑通依赖一个过渡机制：`tools/rnaview_batch.py --engine rust --rust-oracle out`，即 Rust 侧读取 `<input>.out` 作为 oracle（不再 shell out legacy），用于先把“构建/运行不依赖 C + `.out` byte-exact diff”这条链路固化下来；后续实现纯 Rust 计算后，仍可复用同一套 Gate B 回归脚本作为最终验收。
+- Gate B 现已跑通 **结构→Rust compute→`.out(full)`** 的闭环（`--rust-oracle compute`），并作为 CI 的硬门槛；`--rust-oracle out` 仅保留为迁移/调试手段（需要时可用于把“解析/计算差异”与“writer 差异”拆开定位）。
 
 ### Phase 3：工程化与性能（2–6 周）
 
@@ -338,6 +340,14 @@ CI：分层跑（建议拆成独立 job，便于定位失败与并行）
 - bench（只监控性能，不做硬门槛）：`python3 tools/rnaview_bench.py compare --suite phase2 --runs 3 -o out/bench_phase3.json`
 性能：只在不改变 legacy-v1 结果前提下优化（空间索引、邻域筛选、并行），并用基准锁住收益（只报警，不 hard-fail）。
 Phase 4：渲染与格式现代化（在不动 core 的前提下扩展产物）
+
+现状（实证）：
+- Gate D 已落地并进入 CI：`bash test_phase4_gate_d.sh`
+- Golden：`test/golden_render/manifest.json`（canonical `.ps/.xml/.wrl/.svg/.gltf`）
+- 当前 CI 的 candidate backend：`pairs-out-noc3d`
+  - 3D：`.wrl` 由 Rust `render-wrl` 生成（No‑C）
+  - 2D：`.xml/.ps` 仍由 `bin/rnaview_rustcore_release`（C）生成（通过 `RNAVIEW_OUT_PATH` 注入新的 `.out`），因此 **“2D 渲染彻底 No‑C”尚未完成**
+
 M4.0 输出契约（先把验收口径写死）
 目标：在 CI/Linux 容器里，以 legacy `rnaview -p/-v` 为 baseline，做到：
 - 允许中间步骤不同，但最终产物（canonical/normalize 后）必须 `diff 0`
@@ -349,15 +359,21 @@ M4.1 2D：RNAML/XML + PS + SVG
 - RNAML/XML、PS：对齐 legacy `-p`（normalize 后 diff 0）
 - PS 样式完全复刻 legacy（字体/线宽/颜色/线型等；基线见 `BASEPARS/ps_image.par`）
 - SVG：以 legacy `*.ps` 为“渲染权威”，用确定性的 PS→SVG 转换器生成（保证与 legacy 最终图一致；RNAML/XML→SVG 可作为可选语义渲染/调试）
+TODO（交付阻塞项）：实现真正的 2D No‑C renderer：`pairs.json (+source.path) → byte‑exact .xml/.ps`，并把 Gate D candidate 切到该后端（见 M4.4）。
 
 M4.2 3D：VRML + glTF
 - VRML：对齐 legacy `-v`（normalize 后 diff 0）
 - glTF：与 VRML 语义等价；golden 推荐由 legacy VRML 通过确定性转换器生成
+现状：Rust `render-wrl` 已可用，并已通过 Gate D（在 `pairs-out-noc3d` backend 下）；glTF 通过确定性 converter 生成并纳入回归。
 
 M4.3 Gate D（渲染验收 + allowlist）
 - 目标：canonical 输出 byte‑exact（diff 0）
 - allowlist：类似 Gate C，事件级稳定 id（包含 input_id/format/semantics/renderer_version 等）
 - allowlist 文件：`test/gate_d_allowlist.yaml`
+
+M4.4 收尾（把渲染彻底 No‑C，并切 CI）
+- 新增 candidate backend（建议名 `pairs-out-noc`）：只依赖 `rnaview-hotcore`（`render-2d` + `render-wrl`），不再调用任何 C renderer
+- CI：`.github/workflows/ci.yml` 的 Gate D 把 `CANDIDATE_BACKEND` 从 `pairs-out-noc3d` 切到 `pairs-out-noc`
 哪些必须 byte‑exact？哪些可以科学修复？
 必须保持 byte‑exact（对 legacy golden）
 legacy-v1 下的 FILEOUT.out 全文（Gate B），包含解析/过滤/排序/空格/换行等所有历史行为。
@@ -367,3 +383,29 @@ mmCIF chain id 截断策略（见 spec.md (line 138)、spec.md (line 275)）
 insertion code 的表示、NMR 选模策略、altloc 策略等（只要是“历史实现细节”而非科学定义）
 两边都必须保持的底线
 同一 semantics + 同一输入 + 同一组选项 ⇒ 输出确定性（pairs.json 必须可 byte‑diff）；只是 science-v1 的 golden 不再是 legacy，而是它自己的版本化 golden/allowlist。
+
+Phase 5：Python 包交付（PyPI / Notebook：`import rnaview`）
+
+目标：把当前“工具脚本 + Rust 二进制”的形态，升级为可发布、可复用、可在 Notebook 中直接 import 的 Python 包。
+
+M5.0 最小可用交付形态（推荐先做这个）
+- `pip install rnaview` 后可 `import rnaview`
+- 提供一个稳定的高层 API（以 `pairs.json` 为中心契约）+ CLI entrypoint
+- 包内自带运行所需资源（`BASEPARS/*`），不依赖 `$RNAVIEW` 环境变量
+
+M5.1 后端策略（建议分两步）
+- v0（实现快、风险低）：wheel 内置 `rnaview-hotcore`，Python 通过 subprocess 调用（批处理与 CI 场景足够好用）
+- v1（体验更好）：引入 PyO3/maturin，把 Rust core 暴露为 extension module（减少 subprocess 开销；更适合 Notebook 交互与服务化）
+
+M5.2 包结构建议
+- 新增 `pyproject.toml`（PEP 517/518）
+- 把 `tools/` 中可复用逻辑下沉为 `rnaview/` 包（脚本保留，但变成 thin wrapper/entrypoints）
+- `BASEPARS/*` 作为 package data，通过 `importlib.resources` 定位
+
+M5.3 最小 API（示意）
+- `rnaview.analyze(path, *, semantics=\"legacy-v1\", formats=(\"pairs\",\"out\"))`
+- `rnaview.render(pairs_json, *, source_path, formats=(\"ps\",\"svg\",\"wrl\",\"gltf\"))`
+
+M5.4 CI 与发布
+- 增加 wheel 构建 + smoke test（至少验证 `python -c \"import rnaview\"` + 跑 1 个小 case）
+- 初期可以先声明“CI/Linux 容器内一致性”为权威环境；跨平台 wheels 后续补齐

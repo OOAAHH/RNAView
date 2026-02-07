@@ -33,6 +33,8 @@ else
       CANDIDATE_BACKEND="pairs-json"
     elif [[ "$CANDIDATE_CMD" == *"--backend pairs-out-noc3d"* ]]; then
       CANDIDATE_BACKEND="pairs-out-noc3d"
+    elif [[ "$CANDIDATE_CMD" == *"--backend pairs-out-noc"* ]]; then
+      CANDIDATE_BACKEND="pairs-out-noc"
     elif [[ "$CANDIDATE_CMD" == *"--backend pairs-out"* ]]; then
       CANDIDATE_BACKEND="pairs-out"
     elif [[ "$CANDIDATE_CMD" == *"--backend legacy"* ]]; then
@@ -71,6 +73,9 @@ else
       if [[ ! -x "$ROOT/bin/rnaview_rustcore_release" ]]; then
         bash "$ROOT/tools/build_rnaview_rustcore_release.sh"
       fi
+      ;;
+    pairs-out-noc)
+      # pure Rust hotcore renderer (no legacy/C binaries required)
       ;;
     *)
       echo "unknown CANDIDATE_BACKEND: ${CANDIDATE_BACKEND}" >&2
