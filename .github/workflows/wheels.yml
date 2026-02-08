@@ -21,6 +21,12 @@ jobs:
             expected_arch: "arm64"
     steps:
       - uses: actions/checkout@v4
+      - name: "Free disk space (runner)"
+        if: runner.os == 'Linux'
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android || true
+          sudo rm -rf /usr/local/share/boost || true
+          df -h
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -30,7 +36,6 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            rust/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
 
       - name: "Assert runner arch"
@@ -55,11 +60,16 @@ jobs:
           wheels = sorted(glob.glob("dist/*.whl"))
           if not wheels:
             raise SystemExit("no wheels in dist/")
+          want_arch = "${{ matrix.expected_arch }}".lower()
           for w in wheels:
             b = os.path.basename(w)
             print("wheel:", b)
             if "none-any" in b:
               raise SystemExit(f"unexpected pure wheel tag: {b}")
+            if "-py3-none-" not in b:
+              raise SystemExit(f"unexpected wheel tag (want py3-none-PLAT): {b}")
+            if want_arch not in b.lower():
+              raise SystemExit(f"unexpected wheel arch tag (want {want_arch}): {b}")
           PY
 
       - name: "Install wheel"

@@ -10,6 +10,8 @@
 
 从 RNAView 最早的工作（Leontis–Westhof 2001 + RNAView 2003）算起，距今已经二十多年（约 25 年）。近几年 RNA 结构与注释领域发展很快：mmCIF 成为主流格式，NMR/assembly/altloc/修饰核苷/大体系更常见，下游使用场景也从“单机命令行”扩展到“Notebook + 批处理 + 可复现 pipeline”。在现代化重构过程中，我们也暴露并固化了 legacy 代码里一些历史问题/边界行为（见本文的问题清单与 gate 文档）。随着新的 RNA 结构持续被解析，我们相信 RNAView 可以在保持兼容性的同时更进一步——因此这次升级从这里开始。
 
+过去很长一段时间里，我们更常在 **三维几何空间** 里反复测量与归纳：氢键、距离/角度、堆叠与构象，试图总结“折叠规律”。但“规律”本身到底以什么形式存在（显式规则/公式？图结构？统计势？还是某种高维表示的几何？）并没有被充分讨论。近几年深度学习工具的出现提供了新的机会：模型可能把这些规律以 **权重/特征/embedding/隐空间几何** 的方式“存放”在神经网络里，让我们不只在 3D 坐标系中打转，而可以在更多维度上组织与比较结构。RNAView2.0 的现代化升级，一方面把 legacy 经验固化成可复现、可回归的结构化注释（`pairs.json`），另一方面把“兼容性”与“科学改进”分轨管理，目的是让它既能继续服务传统结构分析，也能更容易接入新的方法与下游 pipeline。
+
 ---
 
 ## 1) Notebook / PyPI 快速上手（推荐）
@@ -41,7 +43,7 @@ pip install rnaview
 > 注意：从仓库 `pip install -e .` 默认只安装 Python 包壳（不会自动构建/下载 `rnaview-hotcore`）。你需要额外准备 hotcore（二进制路径见下方）。
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/OOAAHH/RNAView.git
 cd RNAView
 python -m pip install -e .
 ```
@@ -67,7 +69,7 @@ python -m pip install dist/*.whl
 同样需要你自行提供 `RNAVIEW_HOTCORE`：
 
 ```bash
-python -m pip install "rnaview @ git+https://github.com/<org>/<repo>.git"
+python -m pip install "rnaview @ git+https://github.com/OOAAHH/RNAView.git"
 ```
 
 ### 1.2 最小示例：分析结构并得到 `pairs.json` + legacy `.out`
@@ -188,6 +190,37 @@ print("legacy stats:", p_legacy["core"]["stats"])
 print("science stats:", p_science["core"]["stats"])
 ```
 
+### 1.7 Notebook 常见操作：把 `pairs.json` 变成 DataFrame
+
+> 需要 `pandas`：`pip install pandas`
+
+```python
+import json
+from pathlib import Path
+
+import pandas as pd
+
+pairs_path = Path("out/notebook_demo/pairs.json")
+pairs = json.loads(pairs_path.read_text(encoding="utf-8"))
+df = pd.DataFrame(pairs["core"]["base_pairs"])
+df.head()
+```
+
+### 1.8 Notebook 常见操作：筛选某类碱基对
+
+```python
+import json
+from pathlib import Path
+
+pairs = json.loads(Path("out/notebook_demo/pairs.json").read_text(encoding="utf-8"))
+bps = pairs["core"]["base_pairs"]
+
+# 例：找所有 cis 的 LW 分类（lw/orientation 可能为 null，视 case 而定）
+cis = [bp for bp in bps if bp.get("orientation") == "cis"]
+print("num_cis:", len(cis))
+print(cis[:3])
+```
+
 ---
 
 ## 2) 这个项目里有哪几条“线”（实现路径/后端）？
@@ -207,6 +240,22 @@ print("science stats:", p_science["core"]["stats"])
 3) **Python 包（PyPI 交付形态）**：`rnaview`
 - 作用：在 Notebook/批处理里通过 `import rnaview` 调用 hotcore（subprocess）。
 - v0 wheel 会把 `rnaview-hotcore` 作为包内资源放在 `rnaview/_bin/`，并随包一起分发。
+
+整体关系（简化）：
+
+```mermaid
+flowchart TD
+  A["PDB/mmCIF 结构文件"] --> B["rnaview-hotcore from-structure"]
+  B --> C["pairs.json（中心契约）"]
+  B --> D["engine.out（legacy 风格文本）"]
+
+  C --> E["rnaview-hotcore render-2d"] --> F["RNAML XML / PS"]
+  C --> G["rnaview-hotcore render-wrl"] --> H["VRML (.wrl)"]
+
+  I["bin/rnaview（legacy C）"] -. oracle（回归基线） .-> D
+  I -. baseline（legacy 渲染） .-> F
+  I -. baseline（legacy 渲染） .-> H
+```
 
 ### 2.2 渲染回归（Gate D）里常见的 backend 名称
 
@@ -323,6 +372,14 @@ legacy `.out` 是历史生态的兼容接口，Gate B 用它做 **byte-exact** �
 - legacy 提供 `--label` 切换；不同 scheme 会影响链/编号与最终输出。
 - 当前 v0 以兼容为先（默认走 legacy 的 `auth` 口径）；后续会把该选择显式化并纳入契约与回归。
 
+9) **`base_pair_statistics.out` 固定写入当前目录（legacy）**
+- legacy 会无条件写 `base_pair_statistics.out` 到当前工作目录（全局文件名），并发跑库/Notebook 多进程时容易互相覆盖。
+- 新 pipeline/包化交付尽量把所有产物都放进用户指定的 `out_dir/`，避免隐式全局写入。
+
+10) **输入类型探测依赖“扫描文件内容”（legacy）**
+- legacy 会通过扫描文件内容来判断输入是 PDB/mmCIF/RNAML，而不是严格依赖扩展名或显式参数。
+- 在批处理/混合输入时可能导致误判；新 API 尽量显式指定 format（或用扩展名推断），并把选择写入 `pairs.json.options`。
+
 > 我们不会把这些“兼容性风险点”当作隐藏知识：会持续把新发现记录进 `doc/spec.md` / `doc/python-port.md` / `doc/delivery-plan.md`，并用 gate 体系锁住。
 
 ---
@@ -355,6 +412,7 @@ hotcore 与 legacy 都需要 `RNAVIEW` 指向“包含 `BASEPARS/` 的目录”�
 
 - `HotcoreNotFoundError: rnaview-hotcore not found`：说明没找到可执行的 hotcore。优先安装支持的平台 wheel；或设置 `RNAVIEW_HOTCORE=/abs/path/to/rnaview-hotcore`。
 - `embedded rnaview-hotcore is only supported on ...`：说明你当前平台没有内置二进制；同样通过 `RNAVIEW_HOTCORE` 指向外部二进制解决。
+- `OSError: [Errno 8] Exec format error`：通常表示找到了某个 `rnaview-hotcore`，但它是**其他平台/架构**的二进制（例如把 Linux 的 hotcore 放到了 macOS 环境）。删除遗留的 `rnaview/_bin/rnaview-hotcore` 并重新安装匹配平台的 wheel，或通过 `RNAVIEW_HOTCORE` 指向正确的二进制。
 
 ---
 

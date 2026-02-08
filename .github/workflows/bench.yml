@@ -11,6 +11,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: "Free disk space (runner)"
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android || true
+          sudo rm -rf /usr/local/share/boost || true
+          df -h
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -20,7 +25,6 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            rust/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
       - run: bash tools/build_legacy_rnaview.sh
       - run: bash tools/build_rnaview_rustcore_release.sh
@@ -30,4 +34,3 @@ jobs:
         with:
           name: bench-phase3
           path: out/bench_phase3.json
-
