@@ -35,7 +35,7 @@ pip install rnaview
 - mmCIF：`.cif`
 
 其他平台可用两种方式：
-- 使用同事/CI 提供的 `rnaview-hotcore` 二进制，并设置 `RNAVIEW_HOTCORE=/path/to/rnaview-hotcore`
+- 使用CI 提供的 `rnaview-hotcore` 二进制，并设置 `RNAVIEW_HOTCORE=/path/to/rnaview-hotcore`
 - 或从源码自行构建（见下文“开发者：从源码运行/回归/构建 wheel”）
 
 #### B) 从仓库安装（开发/可编辑安装）
@@ -384,7 +384,7 @@ legacy `.out` 是历史生态的兼容接口，Gate B 用它做 **byte-exact** �
 
 ---
 
-## 6) 配置与排错（Notebook 同事最常用）
+## 6) 配置与排错
 
 ### 6.1 hotcore 二进制查找顺序
 
