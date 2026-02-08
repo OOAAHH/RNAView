@@ -1,0 +1,114 @@
+{
+  "allowlist": "test/gate_d_allowlist.yaml",
+  "baseline_manifest": "test/golden_render/manifest.json",
+  "candidate_cmd": [
+    "python3",
+    "tools/rnaview_render.py",
+    "render",
+    "--backend",
+    "pairs-out-noc"
+  ],
+  "candidate_engine": "command",
+  "counts": {
+    "changed": 0,
+    "failed": 15,
+    "ok": 0,
+    "unapproved": 0
+  },
+  "elapsed_ms": 585,
+  "renderer_version": "dev",
+  "results": [
+    {
+      "error": "candidate render command failed (code=1); see /private/var/folders/2r/ppcghstj1_d95rp8xs11xcyr0000gn/T/rnaview_gate_d_compare.q0zyxzre/candidate_render/candidate_render.log",
+      "input": "test/mmcif/insertion_code/1EFW/1EFW.cif",
+      "job_id": "1EFW__26f53222",
+      "status": "failed"
+    },
+    {
+      "error": "candidate render command failed (code=1); see /private/var/folders/2r/ppcghstj1_d95rp8xs11xcyr0000gn/T/rnaview_gate_d_compare.9jvh7u8v/candidate_render/candidate_render.log",
+      "input": "test/mmcif/insertion_code/1VVJ/1VVJ.cif",
+      "job_id": "1VVJ__c7a40134",
+      "status": "failed"
+    },
+    {
+      "error": "candidate render command failed (code=1); see /private/var/folders/2r/ppcghstj1_d95rp8xs11xcyr0000gn/T/rnaview_gate_d_compare.88jqdpog/candidate_render/candidate_render.log",
+      "input": "test/mmcif/insertion_code/4ARC/4ARC.cif",
+      "job_id": "4ARC__ab9c7e43",
+      "status": "failed"
+    },
+    {
+      "error": "candidate render command failed (code=1); see /private/var/folders/2r/ppcghstj1_d95rp8xs11xcyr0000gn/T/rnaview_gate_d_compare.vnm___3a/candidate_render/candidate_render.log",
+      "input": "test/mmcif/nmr_structure/8if5/8if5.cif",
+      "job_id": "8if5__9ce4cf9f",
+      "status": "failed"
+    },
+    {
+      "error": "candidate render command failed (code=1); see /private/var/folders/2r/ppcghstj1_d95rp8xs11xcyr0000gn/T/rnaview_gate_d_compare._40y23v_/candidate_render/candidate_render.log",
+      "input": "test/mmcif/other/6pom/6pom.cif",
+      "job_id": "6pom__82d3711c",
+      "status": "failed"
+    },
+    {
+      "error": "candidate render command failed (code=1); see /private/var/folders/2r/ppcghstj1_d95rp8xs11xcyr0000gn/T/rnaview_gate_d_compare.v5pa1hk6/candidate_render/candidate_render.log",
+      "input": "test/mmcif/x-ray/3P4J/assembly-1/3p4j-assembly1.cif",
+      "job_id": "3p4j-assembly1__b2610a38",
+      "status": "failed"
+    },
+    {
+      "error": "candidate render command failed (code=1); see /private/var/folders/2r/ppcghstj1_d95rp8xs11xcyr0000gn/T/rnaview_gate_d_compare.srmvtds2/candidate_render/candidate_render.log",
+      "input": "test/mmcif/x-ray/434D/assembly-1/434d-assembly1.cif",
+      "job_id": "434d-assembly1__b2a692ef",
+      "status": "failed"
+    },
+    {
+      "error": "candidate render command failed (code=1); see /private/var/folders/2r/ppcghstj1_d95rp8xs11xcyr0000gn/T/rnaview_gate_d_compare.h6uj4p6e/candidate_render/candidate_render.log",
+      "input": "test/mmcif/x-ray/434D/assembly-2/434d-assembly2.cif",
+      "job_id": "434d-assembly2__8a1cb1b7",
+      "status": "failed"
+    },
+    {
+      "error": "candidate render command failed (code=1); see /private/var/folders/2r/ppcghstj1_d95rp8xs11xcyr0000gn/T/rnaview_gate_d_compare.cyxzhym1/candidate_render/candidate_render.log",
+      "input": "test/mmcif/x-ray/4NMG/assembly-1/4nmg-assembly1.cif",
+      "job_id": "4nmg-assembly1__2f46a8f9",
+      "status": "failed"
+    },
+    {
+      "error": "candidate render command failed (code=1); see /private/var/folders/2r/ppcghstj1_d95rp8xs11xcyr0000gn/T/rnaview_gate_d_compare.5zpod9au/candidate_render/candidate_render.log",
+      "input": "test/pdb/pdb1nvy/pdb1nvy.ent",
+      "job_id": "pdb1nvy__e152e1d2",
+      "status": "failed"
+    },
+    {
+      "error": "candidate render command failed (code=1); see /private/var/folders/2r/ppcghstj1_d95rp8xs11xcyr0000gn/T/rnaview_gate_d_compare.elkpswj8/candidate_render/candidate_render.log",
+      "input": "test/pdb/pdb1nvy/pdb1nvy.pdb",
+      "job_id": "pdb1nvy__93035b1b",
+      "status": "failed"
+    },
+    {
+      "error": "candidate render command failed (code=1); see /private/var/folders/2r/ppcghstj1_d95rp8xs11xcyr0000gn/T/rnaview_gate_d_compare.rnpb40j0/candidate_render/candidate_render.log",
+      "input": "test/pdb/test1/test1.pdb",
+      "job_id": "test1__704911ff",
+      "status": "failed"
+    },
+    {
+      "error": "candidate render command failed (code=1); see /private/var/folders/2r/ppcghstj1_d95rp8xs11xcyr0000gn/T/rnaview_gate_d_compare.oparpyxm/candidate_render/candidate_render.log",
+      "input": "test/pdb/tr0001/tr0001.pdb",
+      "job_id": "tr0001__561f5292",
+      "status": "failed"
+    },
+    {
+      "error": "candidate render command failed (code=1); see /private/var/folders/2r/ppcghstj1_d95rp8xs11xcyr0000gn/T/rnaview_gate_d_compare.cxtleq_r/candidate_render/candidate_render.log",
+      "input": "test/pdb/url064/url064.pdb",
+      "job_id": "url064__bc7ec225",
+      "status": "failed"
+    },
+    {
+      "error": "candidate render command failed (code=1); see /private/var/folders/2r/ppcghstj1_d95rp8xs11xcyr0000gn/T/rnaview_gate_d_compare.6htnw615/candidate_render/candidate_render.log",
+      "input": "test/pdb/urx053/urx053.pdb",
+      "job_id": "urx053__93caf9b1",
+      "status": "failed"
+    }
+  ],
+  "schema_version": 1,
+  "semantics": "legacy-v1"
+}

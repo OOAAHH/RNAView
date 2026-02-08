@@ -22,7 +22,12 @@ jobs:
             ~/.cargo/git
             rust/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
-      - run: bash test_phase2_noc.sh
+      - run: OUT_DIR=out_phase2_noc bash test_phase2_noc.sh
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-b-report
+          path: out_phase2_noc
 
   gate-c:
     name: "Gate C: science diff + allowlist"
@@ -63,7 +68,12 @@ jobs:
             ~/.cargo/git
             rust/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
-      - run: bash test_phase3_science.sh
+      - run: OUT_DIR=out_phase3_science bash test_phase3_science.sh
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: science-report
+          path: out_phase3_science
 
   gate-d:
     name: "Gate D: render regression (legacy baseline)"

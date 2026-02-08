@@ -14,7 +14,15 @@ if [[ "${SKIP_BUILD:-0}" != "1" ]]; then
 fi
 
 echo "== rust engine (No-C: structure -> Rust compute -> .out(full)) ==" >&2
-OUT_DIR="$(mktemp -d)"
+OUT_DIR="${OUT_DIR:-}"
+_CLEAN_OUT_DIR_ON_SUCCESS=0
+if [[ -z "$OUT_DIR" ]]; then
+  OUT_DIR="$(mktemp -d)"
+  _CLEAN_OUT_DIR_ON_SUCCESS=1
+else
+  mkdir -p "$OUT_DIR"
+fi
+echo "Gate B out dir: $OUT_DIR" >&2
 if python3 "$ROOT_DIR/tools/rnaview_batch.py" run \
   test/pdb/pdb1nvy/pdb1nvy.pdb \
   test/pdb/test1/test1.pdb \
@@ -36,7 +44,9 @@ if python3 "$ROOT_DIR/tools/rnaview_batch.py" run \
   --regress \
   --regress-mode out \
   --keep-going; then
-  rm -rf "$OUT_DIR"
+  if [[ "${_CLEAN_OUT_DIR_ON_SUCCESS}" -eq 1 ]]; then
+    rm -rf "$OUT_DIR"
+  fi
   exit 0
 fi
 

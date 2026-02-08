@@ -8,13 +8,15 @@
 
 > 重要提示：本项目里 `legacy-v1` 语义强调 **兼容性（byte-exact）**；`science-v*` 语义用于 **科学修复**（差异用 Gate C allowlist 管控）。
 
+从 RNAView 最早的工作（Leontis–Westhof 2001 + RNAView 2003）算起，距今已经二十多年（约 25 年）。近几年 RNA 结构与注释领域发展很快：mmCIF 成为主流格式，NMR/assembly/altloc/修饰核苷/大体系更常见，下游使用场景也从“单机命令行”扩展到“Notebook + 批处理 + 可复现 pipeline”。在现代化重构过程中，我们也暴露并固化了 legacy 代码里一些历史问题/边界行为（见本文的问题清单与 gate 文档）。随着新的 RNA 结构持续被解析，我们相信 RNAView 可以在保持兼容性的同时更进一步——因此这次升级从这里开始。
+
 ---
 
 ## 1) Notebook / PyPI 快速上手（推荐）
 
 ### 1.1 安装
 
-发布到 PyPI 后：
+#### A) 从 PyPI 安装（推荐）
 
 ```bash
 pip install rnaview
@@ -24,6 +26,8 @@ pip install rnaview
 - Linux x86_64
 - macOS arm64（Apple Silicon）
 
+这些 wheels 会内置 `rnaview-hotcore` 二进制；正常使用不需要安装 Rust toolchain。
+
 支持的输入格式：
 - PDB：`.pdb` / `.ent`
 - mmCIF：`.cif`
@@ -31,6 +35,40 @@ pip install rnaview
 其他平台可用两种方式：
 - 使用同事/CI 提供的 `rnaview-hotcore` 二进制，并设置 `RNAVIEW_HOTCORE=/path/to/rnaview-hotcore`
 - 或从源码自行构建（见下文“开发者：从源码运行/回归/构建 wheel”）
+
+#### B) 从仓库安装（开发/可编辑安装）
+
+> 注意：从仓库 `pip install -e .` 默认只安装 Python 包壳（不会自动构建/下载 `rnaview-hotcore`）。你需要额外准备 hotcore（二进制路径见下方）。
+
+```bash
+git clone <your-repo-url>
+cd RNAView
+python -m pip install -e .
+```
+
+构建并指定 hotcore（二选一）：
+
+1) 用 Cargo 构建（需要 Rust toolchain）：
+
+```bash
+cargo build --release --manifest-path rust/Cargo.toml
+export RNAVIEW_HOTCORE="$PWD/rust/target/release/rnaview-hotcore"
+```
+
+2) 直接构建一个“带 hotcore 的 wheel”并安装（v0 方案）：
+
+```bash
+bash tools/build_pypi_v0_wheel.sh
+python -m pip install dist/*.whl
+```
+
+#### C) 直接从 Git URL 安装（可选）
+
+同样需要你自行提供 `RNAVIEW_HOTCORE`：
+
+```bash
+python -m pip install "rnaview @ git+https://github.com/<org>/<repo>.git"
+```
 
 ### 1.2 最小示例：分析结构并得到 `pairs.json` + legacy `.out`
 
@@ -86,7 +124,21 @@ print(outputs.xml, outputs.ps, outputs.wrl)
 
 > 说明：当前 v0 以 legacy RNAML(XML)/PS/VRML 为兼容目标（Gate D canonical diff‑0）。SVG/glTF 目前在仓库工具链里以“确定性转换器”的方式提供（见 `tools/rnaview_ps_svg.py`、`tools/rnaview_vrml_gltf.py`），后续会逐步下沉到 Python 包 API。
 
-### 1.4 更底层的 API（可控输出路径）
+### 1.4 示例：mmCIF 输入
+
+```python
+import rnaview
+
+outputs = rnaview.analyze(
+    "your.cif",
+    out_dir="out/notebook_mmcif",
+    formats=("pairs", "out"),
+    semantics="legacy-v1",
+)
+print(outputs.pairs_json, outputs.out)
+```
+
+### 1.5 更底层的 API（可控输出路径）
 
 当你想自定义输出文件名/路径时，可以用 `rnaview.api`：
 
@@ -113,6 +165,27 @@ render_wrl(
     source_path=input_path,
     out_wrl="out/manual/test1.wrl",
 )
+```
+
+### 1.6 示例：`legacy-v1` vs `science-v1`
+
+`legacy-v1` 用于 byte-exact 兼容；`science-v1` 用于受控的科学修复（差异进入 Gate C allowlist）。
+
+```python
+import json
+
+import rnaview
+
+inp = "your.cif"  # mmCIF 更容易触发 legacy/science 的差异
+
+o_legacy = rnaview.analyze(inp, out_dir="out/legacy", formats=("pairs", "out"), semantics="legacy-v1")
+o_science = rnaview.analyze(inp, out_dir="out/science", formats=("pairs", "out"), semantics="science-v1")
+
+p_legacy = json.loads(o_legacy.pairs_json.read_text(encoding="utf-8"))
+p_science = json.loads(o_science.pairs_json.read_text(encoding="utf-8"))
+
+print("legacy stats:", p_legacy["core"]["stats"])
+print("science stats:", p_science["core"]["stats"])
 ```
 
 ---
@@ -264,6 +337,13 @@ Python 包会按以下顺序找 `rnaview-hotcore`（见 `rnaview/_hotcore.py`）
 2. 包内自带：`rnaview/_bin/rnaview-hotcore`（仅支持 Linux x86_64 + macOS arm64）
 3. PATH：`rnaview-hotcore` 在系统 PATH 中
 
+示例（显式指定外部 hotcore）：
+
+```bash
+export RNAVIEW_HOTCORE="/abs/path/to/rnaview-hotcore"
+python -c "import rnaview; rnaview.analyze('your.pdb', out_dir='out/quick', formats=('pairs','out'))"
+```
+
 ### 6.2 `RNAVIEW` 环境变量
 
 hotcore 与 legacy 都需要 `RNAVIEW` 指向“包含 `BASEPARS/` 的目录”。
@@ -286,8 +366,23 @@ hotcore 与 legacy 都需要 `RNAVIEW` 指向“包含 `BASEPARS/` 的目录”�
 - Gate C（science diff + allowlist）：`bash test_phase3_gate_c.sh`
 - science-v1 冻结回归：`bash test_phase3_science.sh`
 - Gate D（渲染 canonical diff‑0）：`bash test_phase4_gate_d.sh`
+- Phase 3 一键收尾（Gate B + Gate C + science-v1，可附加 extra inputs）：`bash test_phase3_wrapup.sh`
 
-### 7.2 构建 PyPI v0 wheel（本地）
+### 7.2 直接运行 `rnaview-hotcore`（调试/开发）
+
+```bash
+cargo build --release --manifest-path rust/Cargo.toml
+export RNAVIEW="$PWD"  # 让 hotcore 能定位 BASEPARS/*
+
+rust/target/release/rnaview-hotcore from-structure test/pdb/test1/test1.pdb \
+  --format pdb --oracle compute --semantics legacy-v1 \
+  -o out/manual_cli/pairs.json --emit-out out/manual_cli/engine.out
+
+rust/target/release/rnaview-hotcore render-2d out/manual_cli/pairs.json \
+  --source test/pdb/test1/test1.pdb --out-xml out/manual_cli/test1.xml --out-ps out/manual_cli/test1.ps
+```
+
+### 7.3 构建 PyPI v0 wheel（本地）
 
 ```bash
 bash tools/build_pypi_v0_wheel.sh
@@ -298,7 +393,7 @@ bash tools/build_pypi_v0_wheel.sh
 2) 把二进制拷进 `rnaview/_bin/`
 3) `pip wheel . -w dist --no-deps` 产出 wheel
 
-### 7.3 CI：构建平台专用 wheels + 运行 smoke
+### 7.4 CI：构建平台专用 wheels + 运行 smoke
 
 - GitHub Actions 工作流：`.github/workflows/wheels.yml`
 - 会在 Linux x86_64 + macOS arm64 上构建 wheel，并执行最小 smoke（安装 wheel → `import rnaview` → 跑一个 `analyze()`）
