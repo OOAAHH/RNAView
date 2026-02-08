@@ -344,9 +344,9 @@ Phase 4：渲染与格式现代化（在不动 core 的前提下扩展产物）
 现状（实证）：
 - Gate D 已落地并进入 CI：`bash test_phase4_gate_d.sh`
 - Golden：`test/golden_render/manifest.json`（canonical `.ps/.xml/.wrl/.svg/.gltf`）
-- 当前 CI 的 candidate backend：`pairs-out-noc3d`
-  - 3D：`.wrl` 由 Rust `render-wrl` 生成（No‑C）
-  - 2D：`.xml/.ps` 仍由 `bin/rnaview_rustcore_release`（C）生成（通过 `RNAVIEW_OUT_PATH` 注入新的 `.out`），因此 **“2D 渲染彻底 No‑C”尚未完成**
+- 当前 CI 的 candidate backend：`pairs-out-noc`
+  - 2D：`.xml/.ps` 由 Rust `render-2d` 生成（No‑C，Gate D 已收敛）；注意 legacy `xml2ps.c` 在 `k1==99/999` 时不会输出序号 label（“缺口逻辑”），Rust 端需保持一致以避免 byte diff。
+  - 3D：`.wrl` 由 Rust `render-wrl` 生成（No‑C，已通过 Gate D）
 
 M4.0 输出契约（先把验收口径写死）
 目标：在 CI/Linux 容器里，以 legacy `rnaview -p/-v` 为 baseline，做到：
@@ -359,19 +359,19 @@ M4.1 2D：RNAML/XML + PS + SVG
 - RNAML/XML、PS：对齐 legacy `-p`（normalize 后 diff 0）
 - PS 样式完全复刻 legacy（字体/线宽/颜色/线型等；基线见 `BASEPARS/ps_image.par`）
 - SVG：以 legacy `*.ps` 为“渲染权威”，用确定性的 PS→SVG 转换器生成（保证与 legacy 最终图一致；RNAML/XML→SVG 可作为可选语义渲染/调试）
-TODO（交付阻塞项）：实现真正的 2D No‑C renderer：`pairs.json (+source.path) → byte‑exact .xml/.ps`，并把 Gate D candidate 切到该后端（见 M4.4）。
+（已完成）2D No‑C renderer：`pairs.json (+source.path) → byte‑exact .xml/.ps`，Gate D candidate 已切到该后端（见 M4.4）。
 
 M4.2 3D：VRML + glTF
 - VRML：对齐 legacy `-v`（normalize 后 diff 0）
 - glTF：与 VRML 语义等价；golden 推荐由 legacy VRML 通过确定性转换器生成
-现状：Rust `render-wrl` 已可用，并已通过 Gate D（在 `pairs-out-noc3d` backend 下）；glTF 通过确定性 converter 生成并纳入回归。
+现状：Rust `render-wrl` 已可用，并已通过 Gate D（当前 CI backend：`pairs-out-noc`）；glTF 通过确定性 converter 生成并纳入回归。
 
 M4.3 Gate D（渲染验收 + allowlist）
 - 目标：canonical 输出 byte‑exact（diff 0）
 - allowlist：类似 Gate C，事件级稳定 id（包含 input_id/format/semantics/renderer_version 等）
 - allowlist 文件：`test/gate_d_allowlist.yaml`
 
-M4.4 收尾（把渲染彻底 No‑C，并切 CI）
+M4.4 收尾（已完成：把渲染彻底 No‑C，并切 CI）
 - 新增 candidate backend（建议名 `pairs-out-noc`）：只依赖 `rnaview-hotcore`（`render-2d` + `render-wrl`），不再调用任何 C renderer
 - CI：`.github/workflows/ci.yml` 的 Gate D 把 `CANDIDATE_BACKEND` 从 `pairs-out-noc3d` 切到 `pairs-out-noc`
 哪些必须 byte‑exact？哪些可以科学修复？
@@ -407,5 +407,5 @@ M5.3 最小 API（示意）
 - `rnaview.render(pairs_json, *, source_path, formats=(\"ps\",\"svg\",\"wrl\",\"gltf\"))`
 
 M5.4 CI 与发布
-- 增加 wheel 构建 + smoke test（至少验证 `python -c \"import rnaview\"` + 跑 1 个小 case）
-- 初期可以先声明“CI/Linux 容器内一致性”为权威环境；跨平台 wheels 后续补齐
+- 增加 wheel 构建 + smoke test（至少验证 `python -c \"import rnaview\"` + 跑 1 个小 case；见 `.github/workflows/wheels.yml`）
+- 平台专用 wheels：先支持 Linux x86_64 + macOS arm64；其他平台后续补齐（建议走 CI/cibuildwheel/auditwheel）。

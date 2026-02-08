@@ -129,6 +129,74 @@ flowchart TB
 - `tools/build_rnaview_rustcore*.sh`：把 legacy C 源码重新编译链接，但通过 `-DRNAVIEW_RUST_*` 宏把热点函数替换为 Rust 实现（`rust/src/legacy_ffi.rs` + 对应 Rust 实现）。
 - 好处：先锁定 `.out` byte‑exact，再逐步把 C 依赖清零。
 
+### 5.1 新版本算法图示（v2.0 当前实现：No‑C compute + 2D/3D render）
+
+> 这张图更偏“算法/实现调用链”，用于解释 **新版在做什么**，以及 compute/render 两条路径如何共用结构解析与 `pairs.json` 契约。
+
+```mermaid
+flowchart TB
+  structure[Structure input\nPDB/mmCIF]:::io
+
+  out_full[FILEOUT.out (full)\n(byte-exact target)]:::artifact
+  pairs[pairs.json (schema v1)\n(deterministic)]:::artifact
+
+  subgraph compute["No-C compute (Rust)"]
+    cfg[SemanticsConfig + StructurePolicies\n(--semantics + policy overrides)]
+    arrays[build_legacy_arrays\n(1-based legacy arrays)]
+    base_info[compute_base_info\n(base frames / geometry prep)]
+    pair_enum[all_pairs\n(enumerate i<j + classify)]
+    multiplets[bp_network_multiplets]
+    stats[pair_type_statistics]
+    ir[OutFull IR]
+    writer[write_out_full]
+    core_extract[extract_core_from_out_*]
+  end
+
+  structure --> cfg --> arrays --> base_info --> pair_enum
+  pair_enum --> multiplets --> ir
+  pair_enum --> stats --> ir
+  ir --> writer --> out_full
+  out_full --> core_extract --> pairs
+
+  subgraph render2d["2D render (Rust)"]
+    arrays2[build_legacy_arrays\n(re-parse structure)]
+    syn[syn_or_anti]
+    layout[compute_layout_2d\n(best-pair → helix → XY)]
+    rnaml[write_rnaml_xml\n(RNAML XML)]
+    ps[ps_from_rnaml_xml\n(PostScript PS)]
+  end
+
+  structure --> arrays2 --> syn
+  arrays2 --> layout
+  pairs --> layout
+  syn --> rnaml
+  layout --> rnaml --> ps
+
+  subgraph render3d["3D render (Rust)"]
+    wrl_fn[render_vrml_from_pairs_json]
+    wrl[VRML .wrl]
+  end
+
+  structure --> wrl_fn
+  pairs --> wrl_fn --> wrl
+
+  ps --> svg[PS→SVG converter\n(tools/rnaview_ps_svg.py)]
+  wrl --> gltf[VRML→glTF converter\n(tools/rnaview_vrml_gltf.py)]
+
+  classDef io fill:#eef,stroke:#99f,color:#000;
+  classDef artifact fill:#efe,stroke:#9f9,color:#000;
+```
+
+**代码锚点（和上图 1:1 对应）**
+- 结构解析 + policy：`rust/src/structure.rs`、`rust/src/semantics.rs`
+- No‑C compute 主流程：`rust/src/noc_engine.rs`
+- base frames / pairing：`rust/src/legacy_alg.rs`、`rust/src/legacy_pairing.rs`
+- `.out(full)` IR + writer：`rust/src/out_full.rs`
+- `pairs.json` schema：`rust/src/lib.rs`（`PairsJson`/`Core`）
+- 2D：`rust/src/render_2d.rs` → `rust/src/legacy_2d_layout.rs` → `rust/src/legacy_rnaml.rs` → `rust/src/legacy_xml2ps.rs`
+- 3D：`rust/src/vrml_render.rs`
+- 派生格式 converter：`tools/rnaview_ps_svg.py`、`tools/rnaview_vrml_gltf.py`
+
 ---
 
 ## 6. 重构后：代码模块图（“画架构图”用的组件清单）

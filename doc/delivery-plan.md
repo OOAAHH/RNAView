@@ -4,6 +4,7 @@
 
 - Spec/契约口径：`doc/spec.md`
 - 架构图与模块关系：`doc/architecture-diagrams.md`
+  - 新版本算法图示（No‑C compute + 2D/3D render）：见 `doc/architecture-diagrams.md` §5.1
 
 ## 1. 当前完成度（截至 2026-02-07）
 
@@ -15,9 +16,9 @@
 
 **渲染端（Phase 4 / Gate D）**
 
-- ✅ Gate D（legacy baseline + canonicalize + diff‑0）：`bash test_phase4_gate_d.sh`
-- ✅ 3D No‑C（VRML）：`CANDIDATE_BACKEND=pairs-out-noc3d` 下，`.wrl` 由 Rust `render-wrl` 生成并通过 Gate D。
-- ⚠️ 2D 仍非 No‑C：`pairs-out-noc3d` 目前的 `.xml/.ps` 仍由 `bin/rnaview_rustcore_release`（C）生成，只是通过 `RNAVIEW_OUT_PATH` 注入新的 `.out`；因此 Gate D 目前还不能证明“2D 渲染彻底 No‑C”。
+- ✅ Gate D（legacy baseline + canonicalize + diff‑0）：`bash test_phase4_gate_d.sh`（CI candidate backend：`pairs-out-noc`；当前回归集 `ok=15, unapproved=0, failed=0`）
+- ✅ 2D No‑C（XML/PS）：Rust `render-2d` 已与 legacy golden 收敛并通过 Gate D；最后 3 个差异 case 的根因是 legacy `xml2ps.c` 在 `k1==99/999` 时不会输出序号 label（“缺口逻辑”），Rust 端已保持一致。
+- ✅ 3D No‑C（VRML）：Rust `render-wrl` 已通过 Gate D（同 `pairs-out-noc` backend）。
 
 ## 2. 交付版（v1）Definition of Done（建议）
 
@@ -37,7 +38,7 @@
 
 ## 3. 近期里程碑（按交付优先级）
 
-### M4.x：补齐 2D No‑C renderer（关键阻塞项）
+### M4.x：补齐 2D No‑C renderer（已收敛）
 
 目标：实现真正的 `pairs.json (+source.path) → byte‑exact XML/PS`，并切换 Gate D 到 **new-renderer→golden**。
 
@@ -45,7 +46,7 @@
 
 1. **Rust CLI/IR 定稿**：`rnaview-hotcore render-2d <pairs.json> --source <pdb/cif> --out-xml ... --out-ps ...`
 2. **复刻 RNAML writer**：按 legacy `rnaxml-new.c` 逐字节复刻 XML（包含缩进/换行/浮点格式/输出顺序；base-pair 顺序用 `BasePair.out_index`）
-3. **复刻 xml2ps**：按 legacy `xml2ps.c` 逐字节复刻 PS（并遵循 Gate D 的 canonicalization：仅剔除不稳定 header）
+3. **复刻 xml2ps**：按 legacy `xml2ps.c` 逐字节复刻 PS（并遵循 Gate D 的 canonicalization：仅剔除不稳定 header；注意 legacy 在 `k1==99/999` 时不输出序号 label，Rust 端必须保留该“缺口逻辑”以保持 byte‑exact）
 4. **接入 Python 调度**：在 `tools/rnaview_render.py` 增加新 backend（建议命名 `pairs-out-noc`），让 Gate D 的 candidate 不再调用 `bin/rnaview_rustcore_release`
 5. **CI 切换**：`.github/workflows/ci.yml` 的 Gate D `CANDIDATE_BACKEND` 从 `pairs-out-noc3d` 切到 `pairs-out-noc`
 
@@ -66,10 +67,55 @@
 4. **最小可用 API**（示例）：
    - `rnaview.analyze(path, *, semantics="legacy-v1", formats=("out","pairs","ps","svg","wrl","gltf"))`
    - `rnaview.render(pairs_json, *, source_path, formats=...)`
-5. **发布与 CI**：增加 wheel 构建与 smoke test（至少验证 `import rnaview` + 跑一个小 case）。
+5. **发布与 CI**：增加 wheel 构建与 smoke test（至少验证 `import rnaview` + 跑一个小 case；建议用 `.github/workflows/wheels.yml`）。
 
 ## 4. 关键风险与决策点（现在就要想清楚）
 
 - **2D byte‑exact 的工作量**：PS/XML 都是“格式敏感”的 legacy 输出，任何浮点/空白/排序差异都会导致 diff；建议把 2D renderer 当成一个独立子项目推进。
 - **SVG 的可信口径**：当前 Gate D 的 SVG 是从 PS 经 converter 生成；若要保证“SVG 视觉等价于 PS”，需要额外的视觉/光栅化 sanity（不建议一开始就做成 hard gate）。
-- **跨平台 wheel**：如果 v0 先只支持 Linux（CI 容器），文档里要写清楚；后续再补 macOS/Windows wheels。
+- **跨平台 wheel**：v0 先落地 Linux x86_64 + macOS arm64 的平台专用 wheels；Windows / 其他平台后续补齐（建议走 CI/cibuildwheel/auditwheel 的标准发布链路）。
+
+## 5. Legacy → RNAView2.0：代码升级说明（旧到新的“讲解版”）
+
+> 这节不是 spec（验收口径看 `doc/spec.md`），而是“为什么要这么分层、怎么一步步升级”的叙事摘要，方便对外讲清楚/对内 onboarding。
+
+### 5.1 总体变化（一句话）
+
+从 **C 单体（解析+计算+输出+渲染强耦合）** 升级为 **Python 编排 + Rust 热核（可验证、可替换、可逐步科学修复）**，并用 gate 把“兼容性”和“科学改进”分开管理。
+
+### 5.2 迁移策略（按 Gate/Phase 的“可回归切片”）
+
+- **Phase 0–1（oracle + 契约先行）**：把 legacy `.out` 抽成 `pairs.json`（schema v1、确定性序列化），先锁住“科学 core 等价”的回归体系。
+- **Phase 2（byte‑exact + No‑C）**：
+  - Gate A（可选桥接）：`bin/rnaview_rustcore(_release)` 继续跑 C pipeline/writer，但把热点函数替换为 Rust，快速锁定 `.out` 字节级一致。
+  - Gate B（最终交付）：`rnaview-hotcore --oracle compute` 走纯 Rust 解析+计算+writer，默认运行时不依赖任何 C（legacy 仅做测试 oracle）。
+- **Phase 3（科学差异可控）**：引入 `--semantics legacy-v1|science-v1` + policy，允许在 Gate C 中用 allowlist 管控“被解释过的差异”。
+- **Phase 4（渲染收敛）**：渲染侧以 `pairs.json (+source)` 为输入，通过 Gate D 把 XML/PS/WRL 的输出稳定性锁住（必要时做 canonicalize）。
+
+### 5.3 旧 → 新模块映射（定位代码用）
+
+| Legacy C（主要职责） | RNAView2.0（当前仓库实现落点） |
+|---|---|
+| `src/rnaview.c`（CLI 编排 + 解析/清洗 + work_horse） | Python 编排：`tools/rnaview_batch.py` / gates；Rust CLI：`rust/src/main.rs` |
+| `include/cifparse.c`（legacy mmCIF 解析） | Rust 结构解析：`rust/src/structure.rs`（并在 CLI 层提供 mmCIF parser 策略） |
+| `src/fpair*.c`/`pair_type.c`（配对核心） | Rust port：`rust/src/legacy_pairing.rs`、`rust/src/legacy_alg.rs` |
+| `.out` writer（legacy 输出编排） | Rust IR+writer：`rust/src/out_full.rs` |
+| 2D：`ps-xy*.c` + `rnaxml-new.c` + `xml2ps.c` | Rust 2D：`rust/src/legacy_2d_layout.rs` + `rust/src/legacy_rnaml.rs` + `rust/src/legacy_xml2ps.rs`（入口 `rust/src/render_2d.rs`） |
+| 3D：`vrml.c` | Rust 3D：`rust/src/vrml_render.rs` |
+| `$RNAVIEW/BASEPARS/*`（运行时数据） | 交付形态：作为包内资源 + 稳定 API（规划见本文件 §3 M5） |
+
+### 5.4 新架构的“最小心智模型”（写代码时盯这三个点）
+
+1) **`pairs.json` 是中心契约**：批处理、回归、渲染、未来 API 都优先围绕它组织（而不是围绕 legacy `.out` 文本）。
+2) **兼容与科学分叉用 semantics 管**：`legacy-v1` 追求 byte‑exact；`science-v*` 追求科学修复，但必须在 Gate C 中可解释、可回归。
+3) **render 是独立产品线**：尽量做到 `pairs.json (+source)` → 图形产物；渲染差异不要污染 compute 的核心回归口径。
+
+## 6. 2003–2025 basepair 认知进化吸收进 RNAView2.0：项目计划（草案）
+
+这部分不属于“短期交付 v1”的 hard gate，但建议尽早启动（先做材料/基准集），否则后续每一次科学增强都会变成“无锚点的争论”。
+
+- 计划文档：`doc/basepair-evolution-2003-2025.md`
+- 推荐落地抓手（和当前工程体系对齐）：
+  - 用 `Semantics`（`science-v*`）承载科学演进，用 Gate C allowlist 把差异解释进回归
+  - 用 `pairs.json` schema 版本化承载新注释（v1.x → v2 → v3），保持确定性与可迁移
+  - 用 WP0/WP1 把 2003–2025 的关键材料与 truth/regression‑set 固化下来

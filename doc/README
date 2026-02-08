@@ -1,3 +1,7 @@
+NOTE (Modernization):
+  This file is kept for the legacy upstream README text.
+  For the modern Rust hotcore + Python (PyPI/Notebook) usage, see: README.md
+
 RNAVIEW program is developed to quickly display the secondary structure
 of RNA/DNA with tertiary interactions. It is fully implemented with 
 Leontis and Westhof's ( RNA (2001) 7, 499-512), convention for the 

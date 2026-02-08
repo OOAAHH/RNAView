@@ -1,0 +1,94 @@
+name: Wheels
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  wheel:
+    name: "Wheel: ${{ matrix.name }}"
+    runs-on: ${{ matrix.runs_on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "linux-x86_64"
+            runs_on: ubuntu-latest
+            expected_arch: "x86_64"
+          - name: "macos-arm64"
+            runs_on: macos-14
+            expected_arch: "arm64"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
+
+      - name: "Assert runner arch"
+        run: |
+          python - <<'PY'
+          import platform
+          got = platform.machine().lower()
+          want = "${{ matrix.expected_arch }}".lower()
+          print("machine:", got)
+          if got != want:
+            raise SystemExit(f"expected {want}, got {got}")
+          PY
+
+      - name: "Build wheel (bundles rnaview-hotcore)"
+        run: bash tools/build_pypi_v0_wheel.sh
+
+      - name: "Assert platform wheel tag"
+        run: |
+          python - <<'PY'
+          import glob
+          import os
+          wheels = sorted(glob.glob("dist/*.whl"))
+          if not wheels:
+            raise SystemExit("no wheels in dist/")
+          for w in wheels:
+            b = os.path.basename(w)
+            print("wheel:", b)
+            if "none-any" in b:
+              raise SystemExit(f"unexpected pure wheel tag: {b}")
+          PY
+
+      - name: "Install wheel"
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install dist/*.whl
+
+      - name: "Smoke: run analyze()"
+        run: |
+          cd /tmp
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          from rnaview.api import analyze
+
+          ws = Path(os.environ["GITHUB_WORKSPACE"])
+          input_path = ws / "test/pdb/test1/test1.pdb"
+          out_dir = Path("/tmp/rnaview_wheel_smoke")
+          out_dir.mkdir(parents=True, exist_ok=True)
+
+          outputs = analyze(input_path, out_dir=out_dir, formats=("pairs", "out"), semantics="legacy-v1")
+          assert outputs.pairs_json.exists(), outputs.pairs_json
+          assert outputs.out.exists(), outputs.out
+          print("ok:", outputs.pairs_json, outputs.out)
+          PY
+
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.name }}
+          path: dist/*.whl

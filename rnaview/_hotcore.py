@@ -76,13 +76,22 @@ def find_hotcore() -> HotcorePaths:
 
     embedded = embedded_hotcore_path()
     if embedded.exists():
-        if not sys.platform.startswith("linux"):
-            raise HotcoreNotFoundError(
-                f"embedded rnaview-hotcore is only supported on Linux; sys.platform={sys.platform!r}"
-            )
         mach = platform.machine().lower()
-        if mach not in ("x86_64", "amd64"):
-            raise HotcoreNotFoundError(f"embedded rnaview-hotcore is only supported on x86_64; machine={mach!r}")
+        if sys.platform.startswith("linux"):
+            if mach not in ("x86_64", "amd64"):
+                raise HotcoreNotFoundError(
+                    f"embedded rnaview-hotcore is only supported on Linux x86_64; machine={mach!r}"
+                )
+        elif sys.platform == "darwin":
+            if mach not in ("arm64", "aarch64"):
+                raise HotcoreNotFoundError(
+                    f"embedded rnaview-hotcore is only supported on macOS arm64; machine={mach!r}"
+                )
+        else:
+            raise HotcoreNotFoundError(
+                "embedded rnaview-hotcore is only supported on Linux x86_64 and macOS arm64; "
+                f"sys.platform={sys.platform!r}"
+            )
         return HotcorePaths(exe=_prepare_embedded_hotcore(embedded), rnaview_root=data_dir())
 
     which = shutil.which("rnaview-hotcore")
