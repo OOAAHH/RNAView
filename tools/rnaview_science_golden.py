@@ -62,6 +62,20 @@ def _core_out_path(golden_root: Path, input_path: Path) -> Path:
     return golden_root / rel.with_suffix(rel.suffix + ".core.json")
 
 
+def _canonical_core_for_regress(core: Any) -> Any:
+    # Keep science-v1 golden cores focused on scientific content.
+    # `out_index` is renderer/writer bookkeeping and must NOT participate in core equivalence
+    # (see doc/spec.md).
+    if not isinstance(core, dict):
+        return core
+    base_pairs = core.get("base_pairs")
+    if isinstance(base_pairs, list):
+        for bp in base_pairs:
+            if isinstance(bp, dict):
+                bp.pop("out_index", None)
+    return core
+
+
 @dataclass(frozen=True)
 class FreezeResult:
     input: Path
@@ -121,7 +135,7 @@ def _freeze_one(
             )
 
         pairs = json.loads(Path(jr.pairs_json).read_text(encoding="utf-8"))
-        core = pairs.get("core", {})
+        core = _canonical_core_for_regress(pairs.get("core", {}))
 
     expected_core_path: Path | None = None
     if legacy_regress_index is not None:
@@ -132,7 +146,7 @@ def _freeze_one(
     reused = False
     out_path: Path
     if not write_all and expected_core_path is not None:
-        golden_core = json.loads(expected_core_path.read_text(encoding="utf-8"))
+        golden_core = _canonical_core_for_regress(json.loads(expected_core_path.read_text(encoding="utf-8")))
         if core == golden_core:
             reused = True
             out_path = expected_core_path

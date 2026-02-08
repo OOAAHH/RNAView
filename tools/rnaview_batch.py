@@ -259,6 +259,21 @@ def _sysroot_env() -> dict[str, str]:
     return env
 
 
+def _canonical_core_for_regress(core: Any) -> Any:
+    # Core regression is intended to track scientific content (base pairs, multiplets, stats),
+    # not renderer/writer bookkeeping. For example, `out_index` is used to reproduce legacy
+    # `.out` ordering for byte-exact render pipelines, but it must NOT participate in core
+    # equivalence (see doc/spec.md).
+    if not isinstance(core, dict):
+        return core
+    base_pairs = core.get("base_pairs")
+    if isinstance(base_pairs, list):
+        for bp in base_pairs:
+            if isinstance(bp, dict):
+                bp.pop("out_index", None)
+    return core
+
+
 def _find_rust_hotcore_binary(repo: Path) -> Path | None:
     candidates = [
         repo / "rust" / "target" / "release" / "rnaview-hotcore",
@@ -709,6 +724,7 @@ def _run_one_rust(
 
         pairs = json.loads(pairs_path.read_text(encoding="utf-8"))
         core = pairs.get("core", {})
+        core_regress = _canonical_core_for_regress(core)
 
         regress_ok: bool | None = None
         regress_diffs: list[str] | None = None
@@ -718,10 +734,11 @@ def _run_one_rust(
                 regress_ok = None
             elif regress_mode == "core":
                 golden_core = json.loads(golden.core_path.read_text(encoding="utf-8"))
-                if core == golden_core:
+                golden_regress = _canonical_core_for_regress(golden_core)
+                if core_regress == golden_regress:
                     regress_ok = True
                 else:
-                    diffs = list(out_core_mod._iter_differences(golden_core, core, path=""))
+                    diffs = list(out_core_mod._iter_differences(golden_regress, core_regress, path=""))
                     regress_ok = False
                     regress_diffs = diffs[:max_diffs]
                     if not keep_going:

@@ -41,5 +41,41 @@ if python3 "$ROOT_DIR/tools/rnaview_batch.py" run \
   exit 0
 fi
 
+if [[ -f "$OUT_DIR/summary.json" ]]; then
+  echo "== science-v1 regression summary (first failing entries) ==" >&2
+  OUT_DIR="$OUT_DIR" python3 - <<'PY'
+import json
+import os
+from pathlib import Path
+
+out_dir = Path(os.environ["OUT_DIR"])
+summary_path = out_dir / "summary.json"
+data = json.loads(summary_path.read_text(encoding="utf-8"))
+counts = data.get("counts", {})
+print("summary:", summary_path)
+print("counts :", counts)
+
+bad = []
+for r in data.get("results", []):
+    if r.get("status") == "failed" or r.get("regress_ok") is False:
+        bad.append(r)
+
+print("failing:", len(bad))
+for r in bad[:5]:
+    print("---")
+    print("job_id    :", r.get("job_id"))
+    print("input     :", r.get("input"))
+    print("job_dir   :", r.get("job_dir"))
+    print("status    :", r.get("status"))
+    print("error     :", r.get("error"))
+    print("regress_ok:", r.get("regress_ok"))
+    diffs = r.get("regress_diffs") or []
+    if diffs:
+        print("regress_diffs (first 50):")
+        for line in diffs[:50]:
+            print("  " + str(line))
+PY
+fi
+
 echo "FAILED: outputs kept at $OUT_DIR" >&2
 exit 1
