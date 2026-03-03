@@ -180,6 +180,7 @@ Rust (Hot Core Engine)
 
 - `Base`
   - `letter: str`（单字符，保持 legacy 语义：可大写/小写）
+    - DNA/hybrid：`T` 需要在输出中保留为 `T`（不强行归一成 `U`）；但分类逻辑上 `U/T` 视为等价（同一套 LW edge/顺反判定）
   - `resname: str`（3-letter，如 `PSU`）
   - `is_modified: bool`（从 letter 大小写/映射来源推导）
 
@@ -277,7 +278,9 @@ preset 默认值（便于回归口径）：
 
 接口约束：
 
-- 这些参数仅对 **`--oracle compute`（纯 Rust 计算）** 生效；对 `legacy/out` oracle 不允许传入（避免误导性的“伪科学配置”）。
+- 这些参数对两类“需要 Rust 解析结构文件”的路径生效：
+  - `from-structure --oracle compute`（纯 Rust 计算）：允许 `--semantics` 与 policy overrides；对 `legacy/out` oracle 不允许传入（避免误导性的“伪科学配置”）。
+  - `render-2d/render-wrl --source <pdb|cif>`（纯 Rust 渲染）：当渲染器需要再次读取结构文件用于坐标/残基标签等信息时，同样需要应用一致的 `semantics/policies`；推荐与生成该 `pairs.json` 时一致（或直接复用 `pairs.json.options` 的记录）。
 - `legacy-v1` 的 `.out(full)` 必须保持 byte-exact，因此 **不得**在 `.out` 文本中增加任何新字段；追溯信息写入 `pairs.json.options`。
 
 #### 3.3.4 Gate C（science-v1 差异管理）
@@ -299,7 +302,21 @@ Gate C 用于把 “science-v1 相对 legacy-v1 的差异” 做可落盘、可�
 - 回归验收脚本：`bash test_phase3_science.sh`
   - 对 `--semantics science-v1` 的 core 做回归（不比较 `.out` bytes）。
 
-### 3.5 批处理（第一阶段）建议的外部接口契约
+#### 3.3.6 Gate NA（DNA/RNA hybrid：science-v1 self-oracle）
+
+对于 **含 DNA 链的结构**（DNA/RNA hybrid、prot‑DNA‑RNA 等），本仓库不要求 legacy C 具备“科学上正确”的分析能力，因此无法用 legacy 作为 oracle 做 byte‑exact/canonical 回归。为避免这部分场景成为“无回归覆盖的盲区”，引入 Gate NA：
+
+- baseline：`science-v1`
+- 验收形式：**self-oracle**（冻结一份 `science-v1` 输出作为 golden；后续比较当前输出 vs frozen golden）
+- 回归集：`test/hybrid/**`
+- golden：`test/golden_na/**`（包含 `core` + `.out/.xml/.ps/.wrl` 的 canonical 形式）
+- 工具/脚本：
+  - 回归：`bash test_phase4_gate_na.sh`
+  - 冻结/维护：`python3 tools/rnaview_gate_na.py freeze test/hybrid`
+
+> 注：Gate NA 的目标是“稳定性/可回归”，而不是“对齐 legacy”。当后续需要引入科学修复（例如更完整的 chain id 处理、纯 DNA 支持等），应先在 Gate C/新的 allowlist 体系中解释差异，再更新 Gate NA golden。
+
+### 3.4 批处理（第一阶段）建议的外部接口契约
 
 > 这是面向“跑库”的接口 spec（不绑定具体实现）。
 
@@ -316,7 +333,7 @@ Gate C 用于把 “science-v1 相对 legacy-v1 的差异” 做可落盘、可�
   - `2`：参数/输入错误
   - `3`：内部异常（bug）
 
-### 3.4 “科学一致性”的正式定义（用于验收）
+### 3.5 “科学一致性”的正式定义（用于验收）
 
 给定同一输入结构与同一组选项，legacy 与新实现应满足：
 

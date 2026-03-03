@@ -160,12 +160,14 @@ render_2d(
     source_path=input_path,
     out_xml="out/manual/test1.xml",
     out_ps="out/manual/test1.ps",
+    semantics="legacy-v1",
 )
 
 render_wrl(
     "out/manual/pairs.json",
     source_path=input_path,
     out_wrl="out/manual/test1.wrl",
+    semantics="legacy-v1",
 )
 ```
 
@@ -331,6 +333,16 @@ legacy `.out` 是历史生态的兼容接口，Gate B 用它做 **byte-exact** �
 当前 `science-v1` 的第一项修复是：
 - 修复 mmCIF 去氢 bug（对比 `legacy-v1` 会产生差异；差异由 Gate C allowlist 管控）
 
+### 4.3 DNA/RNA hybrid（当前范围）
+
+目前 v0 的 DNA 相关目标是：支持 **含 DNA 链的结构**（DNA/RNA hybrid、prot‑DNA‑RNA 等）跑通全流程并稳定回归；暂不承诺“纯 DNA 体系”的完整科学注释。
+
+- 语义基线：统一使用 `science-v1`（尤其是 mmCIF 输入时）；legacy C 仍作为 RNA 兼容性 oracle，但 **不要求** legacy C 具备对 hybrid 的分析能力。
+- U/T 处理：分类逻辑内部将 `U/T` 视为等价（同一套 LW edge/顺反判定），但输出仍保留原字母（`T` 不强行归一成 `U`）。
+- 回归门槛：新增 Gate NA（science-v1 self-oracle，不依赖 legacy C）：
+  - 跑回归：`bash test_phase4_gate_na.sh`
+  - 更新 golden：`python3 tools/rnaview_gate_na.py freeze test/hybrid`
+
 ---
 
 ## 5) 重构过程中发现/固化的 legacy 问题清单（已记录/非穷尽）
@@ -340,7 +352,7 @@ legacy `.out` 是历史生态的兼容接口，Gate B 用它做 **byte-exact** �
 - 同一输入在不同机器/环境下产生伪 diff
 - 迁移/重写时出现“看似小，实则会炸 gate”的边界条件
 
-截至目前（2026-02），已明确并在代码/文档中固化的点包括：
+截至目前（2026-03），已明确并在代码/文档中固化的点包括：
 
 1) **mmCIF 去氢 bug（legacy）**
 - legacy mmCIF 路径会错误地保留部分氢原子（典型是 4 字符原子名），影响几何判断与统计。
@@ -424,7 +436,13 @@ hotcore 与 legacy 都需要 `RNAVIEW` 指向“包含 `BASEPARS/` 的目录”�
 - Gate C（science diff + allowlist）：`bash test_phase3_gate_c.sh`
 - science-v1 冻结回归：`bash test_phase3_science.sh`
 - Gate D（渲染 canonical diff‑0）：`bash test_phase4_gate_d.sh`
+- Gate NA（DNA/RNA hybrid，science-v1 self-oracle）：`bash test_phase4_gate_na.sh`
+  - （维护 golden）`python tools/rnaview_gate_na.py freeze test/hybrid`
 - Phase 3 一键收尾（Gate B + Gate C + science-v1，可附加 extra inputs）：`bash test_phase3_wrapup.sh`
+
+（可选）从外部 mmCIF manifest 选取 DNA/RNA hybrid 输入：
+- 汇总统计：`python tools/rnaview_manifest.py stats --manifest /path/to/pdb_rna_until_*.tsv`
+- 选取 hybrid（dnaRNA / protDnaRNA）：`python tools/rnaview_manifest.py select --manifest ... --kind dna-rna|prot-dna-rna --existing-only -o out/hybrid_inputs.txt`
 
 ### 7.2 直接运行 `rnaview-hotcore`（调试/开发）
 
@@ -437,7 +455,12 @@ rust/target/release/rnaview-hotcore from-structure test/pdb/test1/test1.pdb \
   -o out/manual_cli/pairs.json --emit-out out/manual_cli/engine.out
 
 rust/target/release/rnaview-hotcore render-2d out/manual_cli/pairs.json \
-  --source test/pdb/test1/test1.pdb --out-xml out/manual_cli/test1.xml --out-ps out/manual_cli/test1.ps
+  --source test/pdb/test1/test1.pdb --semantics legacy-v1 \
+  --out-xml out/manual_cli/test1.xml --out-ps out/manual_cli/test1.ps
+
+rust/target/release/rnaview-hotcore render-wrl out/manual_cli/pairs.json \
+  --source test/pdb/test1/test1.pdb --semantics legacy-v1 \
+  -o out/manual_cli/test1.wrl
 ```
 
 ### 7.3 构建 PyPI v0 wheel（本地）

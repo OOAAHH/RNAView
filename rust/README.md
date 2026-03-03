@@ -80,6 +80,25 @@ cargo run --manifest-path rust/Cargo.toml -- from-out test/pdb/tr0001/tr0001.pdb
 cargo run --manifest-path rust/Cargo.toml -- write-out /tmp/tr0001.pairs.json -o /tmp/tr0001.core.out
 ```
 
+### Render (Phase 4)
+
+Render commands take `pairs.json` as the contract and may re-read the source structure file (`--source`) for coordinates/labels.
+For determinism and compatibility, pass the same `--semantics` (and policy overrides, if any) that were used to generate `pairs.json`.
+
+```bash
+bash tools/cargo_sysroot.sh run --manifest-path rust/Cargo.toml -- \
+  render-2d /tmp/tr0001.pairs.json \
+  --source test/pdb/tr0001/tr0001.pdb \
+  --semantics legacy-v1 \
+  --out-xml /tmp/tr0001.xml --out-ps /tmp/tr0001.ps
+
+bash tools/cargo_sysroot.sh run --manifest-path rust/Cargo.toml -- \
+  render-wrl /tmp/tr0001.pairs.json \
+  --source test/pdb/tr0001/tr0001.pdb \
+  --semantics legacy-v1 \
+  -o /tmp/tr0001.wrl
+```
+
 ### Reuse the existing core regression
 
 ```bash
@@ -96,3 +115,10 @@ python3 tools/rnaview_pairs_json.py validate-golden
 
 - Gate A (legacy + rustcore + rust; byte-exact `.out` regression): `bash test_phase2.sh`
 - Gate B (No-C; Rust+Python only): `bash test_phase2_noc.sh`
+
+## Phase 3/4 regressions
+
+- Gate C (science diff + allowlist): `bash test_phase3_gate_c.sh`
+- science-v1 frozen core regression: `bash test_phase3_science.sh`
+- Gate D (render canonical regression): `bash test_phase4_gate_d.sh`
+- Gate NA (DNA/RNA hybrid, science-v1 self-oracle): `bash test_phase4_gate_na.sh`

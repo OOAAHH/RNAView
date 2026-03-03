@@ -1,0 +1,32 @@
+{
+  "counts": {
+    "failed": 0,
+    "ok": 1
+  },
+  "elapsed_ms": 214,
+  "entries": [
+    {
+      "error": null,
+      "input": "test/hybrid/pdb1nvy_hybrid/pdb1nvy_dna_rna_hybrid.pdb",
+      "input_sha256": "c84c3c7e11c3d29ef3f03485bff7ef9727d447b2204c748a666d8b2e545965b6",
+      "job_id": "pdb1nvy_dna_rna_hybrid__4d2d36f6",
+      "outputs": {
+        "core": "test/golden_na/hybrid/pdb1nvy_hybrid/pdb1nvy_dna_rna_hybrid.pdb.core.json",
+        "out": "test/golden_na/hybrid/pdb1nvy_hybrid/pdb1nvy_dna_rna_hybrid.pdb.out.canon.gz",
+        "ps": "test/golden_na/hybrid/pdb1nvy_hybrid/pdb1nvy_dna_rna_hybrid.pdb.ps.canon.gz",
+        "wrl": "test/golden_na/hybrid/pdb1nvy_hybrid/pdb1nvy_dna_rna_hybrid.pdb.wrl.canon.gz",
+        "xml": "test/golden_na/hybrid/pdb1nvy_hybrid/pdb1nvy_dna_rna_hybrid.pdb.xml.canon.gz"
+      },
+      "status": "ok"
+    }
+  ],
+  "formats": [
+    "core",
+    "out",
+    "ps",
+    "wrl",
+    "xml"
+  ],
+  "schema_version": 1,
+  "semantics": "science-v1"
+}

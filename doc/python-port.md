@@ -183,11 +183,15 @@ Phase 2 有两道门槛（建议都写进里程碑）：
 - CI/可重复构建：把回归（core + `.out`）与基准跑进 CI；提供“一键跑套件 + 产出报告”的脚本。
 - API/CLI 稳定化：错误码、日志、schema 版本策略；为跑库提供更清晰的失败定位信息。
 - 性能优化：在不改变结果的前提下做空间筛选与并行（并用基准锁住收益）。
+- DNA/RNA hybrid：新增 Gate NA（`science-v1` self-oracle；基于 `test/hybrid/**` 冻结 `test/golden_na/**`；不要求 legacy C 具备对 hybrid 的分析能力），避免含 DNA 链结构成为“无回归覆盖的盲区”。
 
 ### Phase 4：渲染与格式现代化（2–6 周）
 
 - 2D：优先输出 `SVG`（易集成网页/论文），其次 `PDF/PNG`；PS 作为兼容。
 - 3D：VRML 可保留，但更现代的是 `glTF` 或直接输出给 PyMOL/ChimeraX 脚本。
+- 回归门槛：
+  - Gate D（legacy baseline + canonical diff‑0）：`bash test_phase4_gate_d.sh`
+  - Gate NA（DNA/RNA hybrid，science-v1 self-oracle）：`bash test_phase4_gate_na.sh`
 
 ## 5. 工作量粗估（以“core/.out 有回归要求”为前提）
 
@@ -344,6 +348,8 @@ Phase 4：渲染与格式现代化（在不动 core 的前提下扩展产物）
 现状（实证）：
 - Gate D 已落地并进入 CI：`bash test_phase4_gate_d.sh`
 - Golden：`test/golden_render/manifest.json`（canonical `.ps/.xml/.wrl/.svg/.gltf`）
+- Gate NA（DNA/RNA hybrid，science-v1 self-oracle）：`bash test_phase4_gate_na.sh`
+- NA Golden：`test/golden_na/manifest.json`（`science-v1` 自举冻结；包含 `core` + `.out/.xml/.ps/.wrl` canonical）
 - 当前 CI 的 candidate backend：`pairs-out-noc`
   - 2D：`.xml/.ps` 由 Rust `render-2d` 生成（No‑C，Gate D 已收敛）；注意 legacy `xml2ps.c` 在 `k1==99/999` 时不会输出序号 label（“缺口逻辑”），Rust 端需保持一致以避免 byte diff。
   - 3D：`.wrl` 由 Rust `render-wrl` 生成（No‑C，已通过 Gate D）

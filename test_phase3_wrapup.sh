@@ -168,4 +168,3 @@ if [[ "${#extra_inputs[@]}" -gt 0 ]]; then
 fi
 
 echo "OK" >&2
-

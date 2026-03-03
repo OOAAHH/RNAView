@@ -11,4 +11,7 @@ python3 -m unittest discover -s "$ROOT_DIR/tools" -p "test_*.py"
 echo "== phase4: Gate D (render canonical regression) ==" >&2
 CANDIDATE_BACKEND="${CANDIDATE_BACKEND:-pairs-out}" bash "$ROOT_DIR/test_phase4_gate_d.sh"
 
+echo "== phase4: Gate NA (DNA/RNA hybrid, science-v1 self-oracle) ==" >&2
+bash "$ROOT_DIR/test_phase4_gate_na.sh"
+
 echo "OK" >&2

@@ -52,16 +52,8 @@ def from_structure(
             fmt,
             "--oracle",
             "compute",
-            "--mmcif-parser",
-            "legacy",
             "--semantics",
             semantics,
-            "--hydrogen-policy",
-            "legacy-mmcif-bug",
-            "--missing-insertion-code",
-            "legacy-question-mark",
-            "--chain-id-policy",
-            "legacy-1char",
             "-o",
             str(out_pairs_json),
             "--emit-out",
@@ -76,6 +68,7 @@ def render_2d(
     source_path: str | os.PathLike[str],
     out_xml: str | os.PathLike[str] | None = None,
     out_ps: str | os.PathLike[str] | None = None,
+    semantics: str = "legacy-v1",
 ) -> None:
     pairs_json = Path(pairs_json).resolve()
     source_path = Path(source_path).resolve()
@@ -88,7 +81,7 @@ def render_2d(
     if out_ps_p is not None:
         out_ps_p.parent.mkdir(parents=True, exist_ok=True)
 
-    args = ["render-2d", str(pairs_json), "--source", str(source_path)]
+    args = ["render-2d", str(pairs_json), "--source", str(source_path), "--semantics", semantics]
     if out_xml_p is not None:
         args += ["--out-xml", str(out_xml_p)]
     if out_ps_p is not None:
@@ -101,12 +94,24 @@ def render_wrl(
     *,
     source_path: str | os.PathLike[str],
     out_wrl: str | os.PathLike[str],
+    semantics: str = "legacy-v1",
 ) -> None:
     pairs_json = Path(pairs_json).resolve()
     source_path = Path(source_path).resolve()
     out_wrl_p = Path(out_wrl).resolve()
     out_wrl_p.parent.mkdir(parents=True, exist_ok=True)
-    run_hotcore(["render-wrl", str(pairs_json), "--source", str(source_path), "-o", str(out_wrl_p)])
+    run_hotcore(
+        [
+            "render-wrl",
+            str(pairs_json),
+            "--source",
+            str(source_path),
+            "--semantics",
+            semantics,
+            "-o",
+            str(out_wrl_p),
+        ]
+    )
 
 
 def analyze(
@@ -128,11 +133,11 @@ def analyze(
     out_xml = out_dir / f"{input_path.name}.xml" if "xml" in formats_set else None
     out_ps = out_dir / f"{input_path.name}.ps" if "ps" in formats_set else None
     if out_xml is not None or out_ps is not None:
-        render_2d(pairs_json, source_path=input_path, out_xml=out_xml, out_ps=out_ps)
+        render_2d(pairs_json, source_path=input_path, out_xml=out_xml, out_ps=out_ps, semantics=semantics)
 
     out_wrl = out_dir / f"{input_path.name}.wrl" if "wrl" in formats_set else None
     if out_wrl is not None:
-        render_wrl(pairs_json, source_path=input_path, out_wrl=out_wrl)
+        render_wrl(pairs_json, source_path=input_path, out_wrl=out_wrl, semantics=semantics)
 
     return AnalyzeOutputs(
         pairs_json=pairs_json,
@@ -141,4 +146,3 @@ def analyze(
         ps=out_ps,
         wrl=out_wrl,
     )
-

@@ -6,7 +6,7 @@
 - 架构图与模块关系：`doc/architecture-diagrams.md`
   - 新版本算法图示（No‑C compute + 2D/3D render）：见 `doc/architecture-diagrams.md` §5.1
 
-## 1. 当前完成度（截至 2026-02-07）
+## 1. 当前完成度（截至 2026-03-03）
 
 **计算端（Phase 0–3）**
 
@@ -19,6 +19,7 @@
 - ✅ Gate D（legacy baseline + canonicalize + diff‑0）：`bash test_phase4_gate_d.sh`（CI candidate backend：`pairs-out-noc`；当前回归集 `ok=15, unapproved=0, failed=0`）
 - ✅ 2D No‑C（XML/PS）：Rust `render-2d` 已与 legacy golden 收敛并通过 Gate D；最后 3 个差异 case 的根因是 legacy `xml2ps.c` 在 `k1==99/999` 时不会输出序号 label（“缺口逻辑”），Rust 端已保持一致。
 - ✅ 3D No‑C（VRML）：Rust `render-wrl` 已通过 Gate D（同 `pairs-out-noc` backend）。
+- 🆕 Gate NA（DNA/RNA hybrid，science-v1 self-oracle）：`bash test_phase4_gate_na.sh`（基于 `test/hybrid/**`；golden 在 `test/golden_na/**`；当前回归集 `ok=1, failed=0`；不要求 legacy C 具备对 hybrid 的分析能力）
 
 ## 2. 交付版（v1）Definition of Done（建议）
 
@@ -44,7 +45,7 @@
 
 落地拆分（建议顺序）：
 
-1. **Rust CLI/IR 定稿**：`rnaview-hotcore render-2d <pairs.json> --source <pdb/cif> --out-xml ... --out-ps ...`
+1. **Rust CLI/IR 定稿**：`rnaview-hotcore render-2d <pairs.json> --source <pdb/cif> --semantics legacy-v1|science-v1 --out-xml ... --out-ps ...`
 2. **复刻 RNAML writer**：按 legacy `rnaxml-new.c` 逐字节复刻 XML（包含缩进/换行/浮点格式/输出顺序；base-pair 顺序用 `BasePair.out_index`）
 3. **复刻 xml2ps**：按 legacy `xml2ps.c` 逐字节复刻 PS（并遵循 Gate D 的 canonicalization：仅剔除不稳定 header；注意 legacy 在 `k1==99/999` 时不输出序号 label，Rust 端必须保留该“缺口逻辑”以保持 byte‑exact）
 4. **接入 Python 调度**：在 `tools/rnaview_render.py` 增加新 backend（建议命名 `pairs-out-noc`），让 Gate D 的 candidate 不再调用 `bin/rnaview_rustcore_release`

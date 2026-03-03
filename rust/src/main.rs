@@ -15,7 +15,7 @@ use std::process::Stdio;
 
 fn usage() -> ! {
     eprintln!(
-        "Usage:\n  rnaview-hotcore from-out <file.out> [-o pairs.json]\n  rnaview-hotcore from-structure <file.pdb|file.cif>\n      [--format pdb|cif]\n      [--oracle legacy|out|compute]\n      [--mmcif-parser legacy|pdbtbx]\n      [--semantics legacy-v1|science-v1]\n      [--hydrogen-policy legacy-mmcif-bug|discard-all|keep-all]\n      [--missing-insertion-code legacy-question-mark|none]\n      [--chain-id-policy legacy-1char|unique-1char]\n      [-o pairs.json]\n      [--emit-out file.out]\n  rnaview-hotcore write-out <pairs.json> [-o candidate.out]\n  rnaview-hotcore render-wrl <pairs.json> [--source <file.pdb|file.cif>] [-o file.wrl]\n  rnaview-hotcore render-2d <pairs.json> [--source <file.pdb|file.cif>] [--out-xml file.xml] [--out-ps file.ps]"
+        "Usage:\n  rnaview-hotcore from-out <file.out> [-o pairs.json]\n  rnaview-hotcore from-structure <file.pdb|file.cif>\n      [--format pdb|cif]\n      [--oracle legacy|out|compute]\n      [--mmcif-parser legacy|pdbtbx]\n      [--semantics legacy-v1|science-v1]\n      [--hydrogen-policy legacy-mmcif-bug|discard-all|keep-all]\n      [--missing-insertion-code legacy-question-mark|none]\n      [--chain-id-policy legacy-1char|unique-1char]\n      [-o pairs.json]\n      [--emit-out file.out]\n  rnaview-hotcore write-out <pairs.json> [-o candidate.out]\n  rnaview-hotcore render-wrl <pairs.json>\n      [--source <file.pdb|file.cif>]\n      [--semantics legacy-v1|science-v1]\n      [--hydrogen-policy legacy-mmcif-bug|discard-all|keep-all]\n      [--missing-insertion-code legacy-question-mark|none]\n      [--chain-id-policy legacy-1char|unique-1char]\n      [-o file.wrl]\n  rnaview-hotcore render-2d <pairs.json>\n      [--source <file.pdb|file.cif>]\n      [--semantics legacy-v1|science-v1]\n      [--hydrogen-policy legacy-mmcif-bug|discard-all|keep-all]\n      [--missing-insertion-code legacy-question-mark|none]\n      [--chain-id-policy legacy-1char|unique-1char]\n      [--out-xml file.xml]\n      [--out-ps file.ps]"
     );
     std::process::exit(2);
 }
@@ -807,6 +807,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let input = PathBuf::from(args.remove(0));
             let mut output: Option<PathBuf> = None;
             let mut source_override: Option<PathBuf> = None;
+            let mut semantics: Option<String> = None;
+            let mut hydrogen_policy: Option<String> = None;
+            let mut missing_insertion_code: Option<String> = None;
+            let mut chain_id_policy: Option<String> = None;
 
             while !args.is_empty() {
                 let flag = args.remove(0);
@@ -822,6 +826,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         usage();
                     }
                     source_override = Some(PathBuf::from(args.remove(0)));
+                    continue;
+                }
+                if flag == "--semantics" {
+                    if args.is_empty() {
+                        usage();
+                    }
+                    semantics = Some(args.remove(0));
+                    continue;
+                }
+                if flag == "--hydrogen-policy" {
+                    if args.is_empty() {
+                        usage();
+                    }
+                    hydrogen_policy = Some(args.remove(0));
+                    continue;
+                }
+                if flag == "--missing-insertion-code" {
+                    if args.is_empty() {
+                        usage();
+                    }
+                    missing_insertion_code = Some(args.remove(0));
+                    continue;
+                }
+                if flag == "--chain-id-policy" {
+                    if args.is_empty() {
+                        usage();
+                    }
+                    chain_id_policy = Some(args.remove(0));
                     continue;
                 }
                 usage();
@@ -845,8 +877,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
             let basepars_vrml = rnaview_root.join("BASEPARS").join("vrml_image.par");
 
-            let policies = SemanticsConfig::defaults(Semantics::LegacyV1).policies.structure;
-            let wrl = render_vrml_from_pairs_json(&pairs, &source_path, &policies, &basepars_vrml)
+            let semantics = semantics
+                .as_deref()
+                .map(Semantics::parse_cli)
+                .transpose()
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?
+                .unwrap_or(Semantics::LegacyV1);
+            let mut structure_policies = SemanticsConfig::defaults(semantics).policies.structure;
+            if let Some(s) = hydrogen_policy.as_deref() {
+                structure_policies.hydrogen_policy = HydrogenPolicy::parse_cli(s)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
+            }
+            if let Some(s) = missing_insertion_code.as_deref() {
+                structure_policies.missing_insertion_code_policy =
+                    MissingInsertionCodePolicy::parse_cli(s)
+                        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
+            }
+            if let Some(s) = chain_id_policy.as_deref() {
+                structure_policies.chain_id_policy = ChainIdPolicy::parse_cli(s)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
+            }
+
+            let wrl = render_vrml_from_pairs_json(&pairs, &source_path, &structure_policies, &basepars_vrml)
                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
             if let Some(out_path) = output {
@@ -864,6 +916,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut out_xml: Option<PathBuf> = None;
             let mut out_ps: Option<PathBuf> = None;
             let mut source_override: Option<PathBuf> = None;
+            let mut semantics: Option<String> = None;
+            let mut hydrogen_policy: Option<String> = None;
+            let mut missing_insertion_code: Option<String> = None;
+            let mut chain_id_policy: Option<String> = None;
 
             while !args.is_empty() {
                 let flag = args.remove(0);
@@ -886,6 +942,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         usage();
                     }
                     out_ps = Some(PathBuf::from(args.remove(0)));
+                    continue;
+                }
+                if flag == "--semantics" {
+                    if args.is_empty() {
+                        usage();
+                    }
+                    semantics = Some(args.remove(0));
+                    continue;
+                }
+                if flag == "--hydrogen-policy" {
+                    if args.is_empty() {
+                        usage();
+                    }
+                    hydrogen_policy = Some(args.remove(0));
+                    continue;
+                }
+                if flag == "--missing-insertion-code" {
+                    if args.is_empty() {
+                        usage();
+                    }
+                    missing_insertion_code = Some(args.remove(0));
+                    continue;
+                }
+                if flag == "--chain-id-policy" {
+                    if args.is_empty() {
+                        usage();
+                    }
+                    chain_id_policy = Some(args.remove(0));
                     continue;
                 }
                 usage();
@@ -916,7 +1000,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
             let basepars_ps_image = rnaview_root.join("BASEPARS").join("ps_image.par");
 
-            let structure_policies = SemanticsConfig::defaults(Semantics::LegacyV1).policies.structure;
+            let semantics = semantics
+                .as_deref()
+                .map(Semantics::parse_cli)
+                .transpose()
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?
+                .unwrap_or(Semantics::LegacyV1);
+            let mut structure_policies = SemanticsConfig::defaults(semantics).policies.structure;
+            if let Some(s) = hydrogen_policy.as_deref() {
+                structure_policies.hydrogen_policy = HydrogenPolicy::parse_cli(s)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
+            }
+            if let Some(s) = missing_insertion_code.as_deref() {
+                structure_policies.missing_insertion_code_policy =
+                    MissingInsertionCodePolicy::parse_cli(s)
+                        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
+            }
+            if let Some(s) = chain_id_policy.as_deref() {
+                structure_policies.chain_id_policy = ChainIdPolicy::parse_cli(s)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
+            }
             let out = rnaview_hotcore::render_2d_from_pairs_json(
                 &pairs,
                 &source_path,
