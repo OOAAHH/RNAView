@@ -13,6 +13,84 @@
 过去很长一段时间里，我们更常在 **三维几何空间** 里反复测量与归纳：氢键、距离/角度、堆叠与构象，试图总结“折叠规律”。但“规律”本身到底以什么形式存在（显式规则/公式？图结构？统计势？还是某种高维表示的几何？）并没有被充分讨论。近几年深度学习工具的出现提供了新的机会：模型可能把这些规律以 **权重/特征/embedding/隐空间几何** 的方式“存放”在神经网络里，让我们不只在 3D 坐标系中打转，而可以在更多维度上组织与比较结构。RNAView2.0 的现代化升级，一方面把 legacy 经验固化成可复现、可回归的结构化注释（`pairs.json`），另一方面把“兼容性”与“科学改进”分轨管理，目的是让它既能继续服务传统结构分析，也能更容易接入新的方法与下游 pipeline。
 
 ---
+背景 / 动机
+我们希望 RNAView2.0 能覆盖 含 DNA 链的结构（DNA/RNA hybrid、prot‑DNA‑RNA 等）的全流程产物（pairs.json + legacy 风格 .out + 2D/3D 渲染），并且可回归。
+
+但这里有两个现实约束：
+
+legacy C 仍是 RNA 兼容性（legacy-v1） 的 oracle；
+不要求 legacy C 对 DNA/hybrid 的分析“科学上正确”，因此 hybrid 场景不能再依赖 legacy C 作为 oracle。
+同时，hybrid/mmCIF 相关的正确性基线应当使用 science-v1（尤其是 mmCIF 去氢策略）。
+
+为此，本 PR 引入 Gate NA（science-v1 self-oracle）：对 hybrid 走 “冻结 science-v1 golden → 后续 compare” 的回归方式，确保这条线可长期演进且不被 legacy 限制。
+
+改动范围（What’s in this PR）
+1) Gate NA：DNA/RNA hybrid 的 science-v1 self-oracle 回归
+新增脚本：bash test_phase4_gate_na.sh
+新增工具：python3 tools/rnaview_gate_na.py freeze|compare ...
+新增最小 hybrid fixture：test/hybrid/**
+新增冻结的 golden：test/golden_na/**
+约定：
+baseline 固定为 science-v1
+输出包含：core + .out/.xml/.ps/.wrl（其中 .out/.xml/.ps/.wrl 存 canonical 形态，便于稳定 diff）
+U/T 分类等价（同一套 LW edge/顺反判定），但 输出保留原字母（T 不强制归一为 U）
+2) Rust hotcore：render 全流程支持 --semantics（+ policy overrides）
+rnaview-hotcore render-2d / render-wrl 增加：
+--semantics legacy-v1|science-v1
+--hydrogen-policy ...
+--missing-insertion-code ...
+--chain-id-policy ...
+目的：渲染侧在 --source <pdb|cif> 二次读结构文件时，能与 compute 侧保持同一语义/策略（避免 “compute 是 science-v1，但 render 仍按 legacy-v1 解析结构” 的不一致）。
+3) Python 包：把 semantics 贯穿 compute → render
+rnaview.api.render_2d/render_wrl 增加 semantics 参数，并在 analyze() 中传递。
+4) Manifest 小工具（选 hybrid 输入池）
+新增：python3 tools/rnaview_manifest.py stats|select ...
+用于从外部 TSV（例如 volume/sunhao/pdb_rna_until_20260205/pdb_rna_until_20260205_mmcif_manifest_clean.tsv）筛选 dnaRNA/protDnaRNA 等输入列表，便于后续扩充 hybrid 回归集。
+5) 文档更新/修正
+README/spec/delivery-plan/python-port/rust README 同步：
+hybrid 目前的范围与非目标
+Gate NA 的定位、如何跑、如何维护 golden
+render 侧需要显式传入 --semantics
+非目标 / 重要说明（Not in scope）
+暂不支持“纯 DNA”作为正式目标（本 PR 只覆盖“含 DNA 链的结构”跑通与可回归）。
+legacy C 仍是 RNA legacy-v1 的 oracle；但 hybrid 的 golden 不依赖 legacy C（Gate NA self-oracle）。
+Gate NA 是 self-oracle：更新 test/golden_na/** 需要有明确理由并进行 review（它不是“对齐 legacy”，而是“锁定稳定性”）。
+怎么跑（How to test / gates）
+在 repo 根目录：
+
+一键收尾（推荐）
+Phase 3（Gate B + Gate C + science-v1 core 回归）：
+bash test_phase3_wrapup.sh
+Phase 4（Gate D + Gate NA）：
+bash test_phase4_wrapup.sh
+CI 的 Gate D candidate backend 是 pairs-out-noc；本地如需对齐 CI，可显式：
+CANDIDATE_BACKEND=pairs-out-noc bash test_phase4_wrapup.sh
+
+只跑 Gate NA
+bash test_phase4_gate_na.sh
+维护 / 更新 Gate NA golden（谨慎）
+python3 tools/rnaview_gate_na.py freeze test/hybrid
+（可选）从 TSV 选择 hybrid 输入池
+python tools/rnaview_manifest.py stats --manifest /path/to/pdb_rna_until_*.tsv
+python tools/rnaview_manifest.py select --manifest /path/to/pdb_rna_until_*.tsv --kind dna-rna|prot-dna-rna --existing-only -o out/hybrid_inputs.txt
+本次实测结果（Docker / linux/amd64 / rust:1.92）
+bash test_phase3_wrapup.sh ✅
+Gate C：ok=14 changed=1 unapproved=0 failed=0
+bash test_phase4_wrapup.sh ✅
+Gate D：ok=15 unapproved=0 failed=0
+Gate NA：ok=1 failed=0
+（首次运行会下载 crates，耗时属于预期。）
+
+后续可选增强（Follow-ups / optional）
+扩充 test/hybrid/**：用 manifest 工具从 dnaRNA/protDnaRNA 中选取更多代表性 mmCIF（含 assembly/NMR/altloc/修饰碱基等），把 Gate NA 从 ok=1 扩到一个小而稳的回归集。
+Gate NA 的演进策略：未来如果要引入更激进的科学修复（例如 chain-id 策略从 legacy-1char 切到 unique-1char），建议先通过 Gate C/新 allowlist 解释差异，再更新 Gate NA golden（避免无解释的 golden 漂移）。
+更进一步的 DNA 方向（暂不做）：纯 DNA 支持、更多 DNA 特有修饰/模板、以及更细的糖/边缘供受体差异建模。
+
+
+---
+# 使用说明
+
+
 
 ## 1) Notebook / PyPI 快速上手（推荐）
 
@@ -492,3 +570,6 @@ RNAView 的原始工作（Leontis–Westhof 分类体系）可参考：
 - Leontis, N. B., Westhof, E. (2001).
   *Geometric nomenclature and classification of RNA base pairs.* RNA 7:499–512.
   https://doi.org/10.1017/s1355838201002515
+
+
+
