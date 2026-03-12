@@ -6,7 +6,7 @@ export RNAVIEW="$ROOT_DIR"
 
 # Phase 3 (science-v1) acceptance:
 # - No-C: pure Rust core + Python orchestration
-# - core regression against frozen science-v1 golden set
+# - core regression against frozen non-DNA science-v1 golden set
 
 if [[ "${SKIP_BUILD:-0}" != "1" ]]; then
   bash "$ROOT_DIR/tools/cargo_sysroot.sh" build --manifest-path "$ROOT_DIR/rust/Cargo.toml"

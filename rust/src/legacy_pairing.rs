@@ -1,5 +1,6 @@
 use crate::legacy_alg::{dot2ang, find_1st_atom, AtomName4, ResName3};
 use crate::out_full::{OutBasePairLine, OutPairKind};
+use crate::ChemistryPolicies;
 
 const BUF512: usize = 512;
 const NP: usize = 101;
@@ -124,6 +125,12 @@ fn pair_code_from_type_field(type_field: &str) -> [u8; 3] {
     [b[0], b[2], b[4]]
 }
 
+fn chemistry_uses_dna_aware_catalog(chemistry_policies: Option<&ChemistryPolicies>) -> bool {
+    chemistry_policies
+        .map(|p| p.edge_catalog_policy == "dna-aware-lw-v1")
+        .unwrap_or(false)
+}
+
 fn ring_center(
     i: usize,
     seidx: &[[usize; 3]],
@@ -216,12 +223,21 @@ fn base_stack(
     }
 }
 
-fn H_catalog(i: usize, m: usize, bseq: &[u8], atom_name: &[AtomName4]) -> (i64, i64) {
+fn H_catalog(
+    i: usize,
+    m: usize,
+    bseq: &[u8],
+    sugar_class: &[u8],
+    atom_name: &[AtomName4],
+    chemistry_policies: Option<&ChemistryPolicies>,
+) -> (i64, i64) {
     let mut without_h = 0i64;
     let mut with_h = 0i64;
 
     let base = to_ascii_upper(*bseq.get(i).unwrap_or(&b'?'));
     let a = atom_name.get(m).copied().unwrap_or(AtomName4([0; 4]));
+    let allow_o2_prime = !chemistry_uses_dna_aware_catalog(chemistry_policies)
+        || sugar_class.get(i).copied().unwrap_or(0) == 1;
 
     let eq = |s: [u8; 4]| atom_eq(a, s);
 
@@ -232,7 +248,7 @@ fn H_catalog(i: usize, m: usize, bseq: &[u8], atom_name: &[AtomName4]) -> (i64, 
             {
                 without_h = 1;
             }
-            if eq(*b" N1 ") || eq(*b" N6 ") || eq(*b" C8 ") || eq(*b" C2 ") || eq(*b" O2'") {
+            if eq(*b" N1 ") || eq(*b" N6 ") || eq(*b" C8 ") || eq(*b" C2 ") || (allow_o2_prime && eq(*b" O2'")) {
                 with_h = 1;
             }
         }
@@ -242,7 +258,7 @@ fn H_catalog(i: usize, m: usize, bseq: &[u8], atom_name: &[AtomName4]) -> (i64, 
             {
                 without_h = 1;
             }
-            if eq(*b" N1 ") || eq(*b" N2 ") || eq(*b" C8 ") || eq(*b" O2'") {
+            if eq(*b" N1 ") || eq(*b" N2 ") || eq(*b" C8 ") || (allow_o2_prime && eq(*b" O2'")) {
                 with_h = 1;
             }
         }
@@ -252,7 +268,7 @@ fn H_catalog(i: usize, m: usize, bseq: &[u8], atom_name: &[AtomName4]) -> (i64, 
             {
                 without_h = 1;
             }
-            if eq(*b" N1 ") || eq(*b" C2 ") || eq(*b" C8 ") || eq(*b" O2'") {
+            if eq(*b" N1 ") || eq(*b" C2 ") || eq(*b" C8 ") || (allow_o2_prime && eq(*b" O2'")) {
                 with_h = 1;
             }
         }
@@ -262,7 +278,7 @@ fn H_catalog(i: usize, m: usize, bseq: &[u8], atom_name: &[AtomName4]) -> (i64, 
             {
                 without_h = 1;
             }
-            if eq(*b" N3 ") || eq(*b" C5 ") || eq(*b" C6 ") || eq(*b" O2'") {
+            if eq(*b" N3 ") || eq(*b" C5 ") || eq(*b" C6 ") || (allow_o2_prime && eq(*b" O2'")) {
                 with_h = 1;
             }
         }
@@ -282,7 +298,7 @@ fn H_catalog(i: usize, m: usize, bseq: &[u8], atom_name: &[AtomName4]) -> (i64, 
             {
                 without_h = 1;
             }
-            if eq(*b" N3 ") || eq(*b" N4 ") || eq(*b" C5 ") || eq(*b" C6 ") || eq(*b" O2'") {
+            if eq(*b" N3 ") || eq(*b" N4 ") || eq(*b" C5 ") || eq(*b" C6 ") || (allow_o2_prime && eq(*b" O2'")) {
                 with_h = 1;
             }
         }
@@ -292,7 +308,7 @@ fn H_catalog(i: usize, m: usize, bseq: &[u8], atom_name: &[AtomName4]) -> (i64, 
             {
                 without_h = 1;
             }
-            if eq(*b" N1 ") || eq(*b" N3 ") || eq(*b" C6 ") || eq(*b" O2'") {
+            if eq(*b" N1 ") || eq(*b" N3 ") || eq(*b" C6 ") || (allow_o2_prime && eq(*b" O2'")) {
                 with_h = 1;
             }
         }
@@ -308,10 +324,12 @@ fn Hbond_pair(
     seidx: &[[usize; 3]],
     atom_name: &[AtomName4],
     bseq: &[u8],
+    sugar_class: &[u8],
     xyz: &[[f64; 4]],
     change: f64,
     c_key: i64,
     bone_key: i64,
+    chemistry_policies: Option<&ChemistryPolicies>,
 ) -> Vec<(AtomName4, AtomName4, f64)> {
     let ib = seidx.get(i).and_then(|v| v.get(1).copied()).unwrap_or(0);
     let ie = seidx.get(i).and_then(|v| v.get(2).copied()).unwrap_or(0);
@@ -356,7 +374,7 @@ fn Hbond_pair(
             }
         }
 
-        let (without_h_m, _with_h_m) = H_catalog(i, m, bseq, atom_name);
+        let (without_h_m, _with_h_m) = H_catalog(i, m, bseq, sugar_class, atom_name, chemistry_policies);
 
         for n in jb..=je {
             let an = atom_name[n];
@@ -407,7 +425,7 @@ fn Hbond_pair(
                 continue;
             }
 
-            let (without_h_n, _with_h_n) = H_catalog(j, n, bseq, atom_name);
+            let (without_h_n, _with_h_n) = H_catalog(j, n, bseq, sugar_class, atom_name, chemistry_policies);
             if without_h_m == 1 && without_h_n == 1 {
                 continue;
             }
@@ -452,6 +470,7 @@ pub(crate) fn check_pairs(
     i: usize,
     j: usize,
     bseq: &[u8],
+    sugar_class: &[u8],
     seidx: &[[usize; 3]],
     xyz: &[[f64; 4]],
     nxyz: &[[f64; 4]],
@@ -461,6 +480,7 @@ pub(crate) fn check_pairs(
     bprs: &[f64; 7],
     rtn_val: &mut [f64; 21],
     network: i64,
+    chemistry_policies: Option<&ChemistryPolicies>,
 ) -> i64 {
     static WC: [[u8; 2]; 8] = [*b"AT", *b"AU", *b"TA", *b"UA", *b"GC", *b"CG", *b"IC", *b"CI"];
 
@@ -552,8 +572,8 @@ pub(crate) fn check_pairs(
             if !(is_in(b"ON", an[1]) && an[0] == b' ' && is_ascii_digit(an[2]) && an[3] == b' ') {
                 continue;
             }
-            let (without_h_m, _) = H_catalog(i, m, bseq, atom_name);
-            let (without_h_n, _) = H_catalog(j, n, bseq, atom_name);
+            let (without_h_m, _) = H_catalog(i, m, bseq, sugar_class, atom_name, chemistry_policies);
+            let (without_h_n, _) = H_catalog(j, n, bseq, sugar_class, atom_name, chemistry_policies);
             if without_h_m == 1 && without_h_n == 1 {
                 continue;
             }
@@ -657,7 +677,12 @@ fn get_unequility(atoms: &[AtomName4]) -> Vec<AtomName4> {
     uniq
 }
 
-fn edge_type(atoms: &[AtomName4], base: u8) -> String {
+fn edge_type(
+    atoms: &[AtomName4],
+    base: u8,
+    sugar_class_code: u8,
+    chemistry_policies: Option<&ChemistryPolicies>,
+) -> String {
     let mut watson = 0i64;
     let mut hoogsteen = 0i64;
     let mut sugar = 0i64;
@@ -665,6 +690,7 @@ fn edge_type(atoms: &[AtomName4], base: u8) -> String {
     let eq = |a: AtomName4, s: [u8; 4]| atom_eq(a, s);
 
     let b = base as char;
+    let allow_o2_prime = !chemistry_uses_dna_aware_catalog(chemistry_policies) || sugar_class_code == 1;
 
     for &a in atoms {
         match b {
@@ -683,7 +709,7 @@ fn edge_type(atoms: &[AtomName4], base: u8) -> String {
                     || eq(a, *b" C2'")
                     || eq(a, *b" C3'")
                     || eq(a, *b" O3'")
-                    || eq(a, *b" O2'")
+                    || (allow_o2_prime && eq(a, *b" O2'"))
                 {
                     sugar += 1;
                 }
@@ -703,7 +729,7 @@ fn edge_type(atoms: &[AtomName4], base: u8) -> String {
                     || eq(a, *b" C2'")
                     || eq(a, *b" C3'")
                     || eq(a, *b" O3'")
-                    || eq(a, *b" O2'")
+                    || (allow_o2_prime && eq(a, *b" O2'"))
                 {
                     sugar += 1;
                 }
@@ -721,7 +747,7 @@ fn edge_type(atoms: &[AtomName4], base: u8) -> String {
                     || eq(a, *b" N9 ")
                     || eq(a, *b" C1'")
                     || eq(a, *b" C2'")
-                    || eq(a, *b" O2'")
+                    || (allow_o2_prime && eq(a, *b" O2'"))
                 {
                     sugar += 1;
                 }
@@ -739,7 +765,7 @@ fn edge_type(atoms: &[AtomName4], base: u8) -> String {
                     || eq(a, *b" C2'")
                     || eq(a, *b" C3'")
                     || eq(a, *b" O3'")
-                    || eq(a, *b" O2'")
+                    || (allow_o2_prime && eq(a, *b" O2'"))
                 {
                     sugar += 1;
                 }
@@ -757,7 +783,7 @@ fn edge_type(atoms: &[AtomName4], base: u8) -> String {
                     || eq(a, *b" C2'")
                     || eq(a, *b" C3'")
                     || eq(a, *b" O3'")
-                    || eq(a, *b" O2'")
+                    || (allow_o2_prime && eq(a, *b" O2'"))
                 {
                     sugar += 1;
                 }
@@ -775,7 +801,7 @@ fn edge_type(atoms: &[AtomName4], base: u8) -> String {
                     || eq(a, *b" C2'")
                     || eq(a, *b" C3'")
                     || eq(a, *b" O3'")
-                    || eq(a, *b" O2'")
+                    || (allow_o2_prime && eq(a, *b" O2'"))
                 {
                     sugar += 1;
                 }
@@ -808,7 +834,14 @@ fn edge_type(atoms: &[AtomName4], base: u8) -> String {
     out
 }
 
-fn get_pair_type(hbonds: &[(AtomName4, AtomName4, f64)], i: usize, j: usize, bseq: &[u8]) -> String {
+fn get_pair_type(
+    hbonds: &[(AtomName4, AtomName4, f64)],
+    i: usize,
+    j: usize,
+    bseq: &[u8],
+    sugar_class: &[u8],
+    chemistry_policies: Option<&ChemistryPolicies>,
+) -> String {
     if hbonds.is_empty() {
         return "?/?".to_string();
     }
@@ -819,8 +852,18 @@ fn get_pair_type(hbonds: &[(AtomName4, AtomName4, f64)], i: usize, j: usize, bse
     let uniq1 = get_unequility(&a1);
     let uniq2 = get_unequility(&a2);
 
-    let t1 = edge_type(&uniq1, bseq[i]);
-    let t2 = edge_type(&uniq2, bseq[j]);
+    let t1 = edge_type(
+        &uniq1,
+        bseq[i],
+        sugar_class.get(i).copied().unwrap_or(0),
+        chemistry_policies,
+    );
+    let t2 = edge_type(
+        &uniq2,
+        bseq[j],
+        sugar_class.get(j).copied().unwrap_or(0),
+        chemistry_policies,
+    );
     format!("{t1}/{t2}")
 }
 
@@ -1000,6 +1043,8 @@ fn LW_pair_type(
     atom_name: &[AtomName4],
     xyz: &[[f64; 4]],
     bseq: &[u8],
+    sugar_class: &[u8],
+    chemistry_policies: Option<&ChemistryPolicies>,
 ) -> String {
     let debug_pair: Option<(usize, usize)> = std::env::var("RNAVIEW_DEBUG_PAIR")
         .ok()
@@ -1029,7 +1074,7 @@ fn LW_pair_type(
             );
         }
     }
-    type_field = get_pair_type(&hbonds, i, j, bseq);
+    type_field = get_pair_type(&hbonds, i, j, bseq, sugar_class, chemistry_policies);
 
     if type_field.as_bytes().get(0) == Some(&b'S') && type_field.as_bytes().get(2) == Some(&b'S') {
         if let Some(s) = get_orientation_SS(i, j, seidx, atom_name, xyz) {
@@ -1042,7 +1087,7 @@ fn LW_pair_type(
     let tmp = pair_code_from_type_field(&type_field);
     if &tmp == b"SWt" || &tmp == b"WSt" {
         let hbonds = get_hbond_ij(i, j, 5.1, seidx, atom_name, xyz);
-        type_field = get_pair_type(&hbonds, i, j, bseq);
+        type_field = get_pair_type(&hbonds, i, j, bseq, sugar_class, chemistry_policies);
         type_field.push_str(&cis_tran);
     }
     type_field
@@ -1473,6 +1518,8 @@ pub(crate) fn all_pairs(
     chain_id: &[u8],
     resseq: &[i32],
     bseq: &[u8],
+    sugar_class: &[u8],
+    chemistry_policies: Option<&ChemistryPolicies>,
 ) -> Result<AllPairsResult, String> {
     let sugar_syn = syn_or_anti(num_residue, atom_name, seidx, xyz, ry);
 
@@ -1511,7 +1558,20 @@ pub(crate) fn all_pairs(
         let syn_j = sugar_syn.get(j).copied().unwrap_or(0) == 1;
 
         let bpid = check_pairs(
-            i, j, bseq, seidx, xyz, nxyz, orien, org, atom_name, bprs, &mut rtn_val, 0,
+            i,
+            j,
+            bseq,
+            sugar_class,
+            seidx,
+            xyz,
+            nxyz,
+            orien,
+            org,
+            atom_name,
+            bprs,
+            &mut rtn_val,
+            0,
+            chemistry_policies,
         );
         if debug_pair == Some((i, j)) {
             eprintln!(
@@ -1525,7 +1585,7 @@ pub(crate) fn all_pairs(
         }
 
         if bpid != 0 {
-            let hbonds = Hbond_pair(i, j, seidx, atom_name, bseq, xyz, 0.35, 1, 0);
+            let hbonds = Hbond_pair(i, j, seidx, atom_name, bseq, sugar_class, xyz, 0.35, 1, 0, chemistry_policies);
             let mut nnh = 0i64;
             for (a1, a2, _) in &hbonds {
                 if a1.0[3] != b' ' && a2.0[3] != b' ' {
@@ -1546,7 +1606,7 @@ pub(crate) fn all_pairs(
             }
 
             if nnh == 1 {
-                let type_field = LW_pair_type(i, j, 5.2, seidx, atom_name, xyz, bseq);
+                let type_field = LW_pair_type(i, j, 5.2, seidx, atom_name, xyz, bseq, sugar_class, chemistry_policies);
                 base_single.push(OutBasePairLine {
                     i: i as i32,
                     j: j as i32,
@@ -1577,7 +1637,7 @@ pub(crate) fn all_pairs(
 
             if (nh1 == 1 && nh2 > 1) || (nh2 == 1 && nh1 > 1) {
                 if rtn_val[2] > bprs[3] - 0.6 || rtn_val[3] > bprs[4] - 20.0 {
-                    let type_field = LW_pair_type(i, j, 5.0, seidx, atom_name, xyz, bseq);
+                    let type_field = LW_pair_type(i, j, 5.0, seidx, atom_name, xyz, bseq, sugar_class, chemistry_policies);
                     base_single.push(OutBasePairLine {
                         i: i as i32,
                         j: j as i32,
@@ -1596,11 +1656,11 @@ pub(crate) fn all_pairs(
                     continue;
                 }
 
-                type_field = LW_pair_type(i, j, 4.329, seidx, atom_name, xyz, bseq);
+                type_field = LW_pair_type(i, j, 4.329, seidx, atom_name, xyz, bseq, sugar_class, chemistry_policies);
                 tmp_str = String::from_utf8_lossy(&pair_code_from_type_field(&type_field)).to_string();
 
                 if tmp_str.contains('.') || tmp_str.contains('?') || rtn_val[2] > bprs[3] - 0.4 || rtn_val[3] > bprs[4] - 15.0 {
-                    let type_field = LW_pair_type(i, j, 5.0, seidx, atom_name, xyz, bseq);
+                    let type_field = LW_pair_type(i, j, 5.0, seidx, atom_name, xyz, bseq, sugar_class, chemistry_policies);
                     base_single.push(OutBasePairLine {
                         i: i as i32,
                         j: j as i32,
@@ -1630,10 +1690,10 @@ pub(crate) fn all_pairs(
                         type_field = "X/X cis ".to_string();
                     }
                 } else {
-                    type_field = LW_pair_type(i, j, 4.1, seidx, atom_name, xyz, bseq);
+                    type_field = LW_pair_type(i, j, 4.1, seidx, atom_name, xyz, bseq, sugar_class, chemistry_policies);
                     tmp_str = String::from_utf8_lossy(&pair_code_from_type_field(&type_field)).to_string();
                     if tmp_str.contains('.') || tmp_str.contains('?') {
-                        type_field = LW_pair_type(i, j, 4.3, seidx, atom_name, xyz, bseq);
+                        type_field = LW_pair_type(i, j, 4.3, seidx, atom_name, xyz, bseq, sugar_class, chemistry_policies);
                     }
                 }
             }
@@ -1714,7 +1774,7 @@ pub(crate) fn all_pairs(
             continue;
         }
 
-        let hbonds = Hbond_pair(i, j, seidx, atom_name, bseq, xyz, 0.0, 0, 1);
+        let hbonds = Hbond_pair(i, j, seidx, atom_name, bseq, sugar_class, xyz, 0.0, 0, 1, chemistry_policies);
         if debug_pair == Some((i, j)) {
             eprintln!("RNAVIEW_DEBUG_PAIR {i}_{j}: tertiary nh={}", hbonds.len());
             for (a1, a2, d) in &hbonds {
@@ -1758,9 +1818,9 @@ pub(crate) fn all_pairs(
 
         let nh = hbonds.len() as i64;
         if nh == nc1 {
-            let mut type_field = LW_pair_type(i, j, 4.8, seidx, atom_name, xyz, bseq);
+            let mut type_field = LW_pair_type(i, j, 4.8, seidx, atom_name, xyz, bseq, sugar_class, chemistry_policies);
             if tmp_str.contains('.') || tmp_str.contains('?') {
-                type_field = LW_pair_type(i, j, 5.8, seidx, atom_name, xyz, bseq);
+                type_field = LW_pair_type(i, j, 5.8, seidx, atom_name, xyz, bseq, sugar_class, chemistry_policies);
             }
             base_sugar.push(OutBasePairLine {
                 i: i as i32,
@@ -1778,9 +1838,9 @@ pub(crate) fn all_pairs(
                 note: Some("!(b_s)".to_string()),
             });
         } else if nh == nc2 {
-            let mut type_field = LW_pair_type(i, j, 4.8, seidx, atom_name, xyz, bseq);
+            let mut type_field = LW_pair_type(i, j, 4.8, seidx, atom_name, xyz, bseq, sugar_class, chemistry_policies);
             if tmp_str.contains('.') || tmp_str.contains('?') {
-                type_field = LW_pair_type(i, j, 5.8, seidx, atom_name, xyz, bseq);
+                type_field = LW_pair_type(i, j, 5.8, seidx, atom_name, xyz, bseq, sugar_class, chemistry_policies);
             }
             base_p.push(OutBasePairLine {
                 i: i as i32,
@@ -1798,9 +1858,9 @@ pub(crate) fn all_pairs(
                 note: Some("!b_(O1P,O2P)".to_string()),
             });
         } else {
-            let mut type_field = LW_pair_type(i, j, 5.2, seidx, atom_name, xyz, bseq);
+            let mut type_field = LW_pair_type(i, j, 5.2, seidx, atom_name, xyz, bseq, sugar_class, chemistry_policies);
             if tmp_str.contains('.') || tmp_str.contains('?') {
-                type_field = LW_pair_type(i, j, 6.0, seidx, atom_name, xyz, bseq);
+                type_field = LW_pair_type(i, j, 6.0, seidx, atom_name, xyz, bseq, sugar_class, chemistry_policies);
             }
             other.push(OutBasePairLine {
                 i: i as i32,
@@ -1844,11 +1904,26 @@ fn check_pair_network(
     org: &[[f64; 4]],
     atom_name: &[AtomName4],
     bseq: &[u8],
+    sugar_class: &[u8],
     bprs: &[f64; 7],
+    chemistry_policies: Option<&ChemistryPolicies>,
 ) -> (bool, f64) {
     let mut rtn_val = [0.0f64; 21];
     let bpid = check_pairs(
-        i, j, bseq, seidx, xyz, nxyz, orien, org, atom_name, bprs, &mut rtn_val, 1,
+        i,
+        j,
+        bseq,
+        sugar_class,
+        seidx,
+        xyz,
+        nxyz,
+        orien,
+        org,
+        atom_name,
+        bprs,
+        &mut rtn_val,
+        1,
+        chemistry_policies,
     );
     (bpid != 0, rtn_val[2])
 }
@@ -1903,11 +1978,13 @@ pub(crate) fn bp_network_multiplets(
     resseq: &[i32],
     xyz: &[[f64; 4]],
     bseq: &[u8],
+    sugar_class: &[u8],
     pair_info_in: &[Vec<usize>],
     nxyz: &[[f64; 4]],
     orien: &[[f64; 10]],
     org: &[[f64; 4]],
     bprs: &[f64; 7],
+    chemistry_policies: Option<&ChemistryPolicies>,
 ) -> Result<Option<Vec<String>>, String> {
     let debug_net: Option<usize> = std::env::var("RNAVIEW_DEBUG_NET")
         .ok()
@@ -1984,7 +2061,9 @@ pub(crate) fn bp_network_multiplets(
                     org,
                     atom_name,
                     bseq,
+                    sugar_class,
                     bprs,
+                    chemistry_policies,
                 );
                 if !ok {
                     idx1[mcount] = 1_000_000 + ivec[k] as i64;

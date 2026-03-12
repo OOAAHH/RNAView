@@ -1,21 +1,63 @@
 {
   "counts": {
     "failed": 0,
-    "ok": 1
+    "ok": 4
   },
-  "elapsed_ms": 214,
+  "elapsed_ms": 530,
   "entries": [
     {
       "error": null,
       "input": "test/hybrid/pdb1nvy_hybrid/pdb1nvy_dna_rna_hybrid.pdb",
       "input_sha256": "c84c3c7e11c3d29ef3f03485bff7ef9727d447b2204c748a666d8b2e545965b6",
-      "job_id": "pdb1nvy_dna_rna_hybrid__4d2d36f6",
+      "job_id": "pdb1nvy_dna_rna_hybrid__dc397f61",
       "outputs": {
         "core": "test/golden_na/hybrid/pdb1nvy_hybrid/pdb1nvy_dna_rna_hybrid.pdb.core.json",
         "out": "test/golden_na/hybrid/pdb1nvy_hybrid/pdb1nvy_dna_rna_hybrid.pdb.out.canon.gz",
         "ps": "test/golden_na/hybrid/pdb1nvy_hybrid/pdb1nvy_dna_rna_hybrid.pdb.ps.canon.gz",
         "wrl": "test/golden_na/hybrid/pdb1nvy_hybrid/pdb1nvy_dna_rna_hybrid.pdb.wrl.canon.gz",
         "xml": "test/golden_na/hybrid/pdb1nvy_hybrid/pdb1nvy_dna_rna_hybrid.pdb.xml.canon.gz"
+      },
+      "status": "ok"
+    },
+    {
+      "error": null,
+      "input": "test/mmcif/nmr_structure/8if5/8if5.cif",
+      "input_sha256": "de136375c89e799a6fef366be1066551694ac6679474694fa4d3b5b205d0e66b",
+      "job_id": "8if5__20e53330",
+      "outputs": {
+        "core": "test/golden_na/mmcif/nmr_structure/8if5/8if5.cif.core.json",
+        "out": "test/golden_na/mmcif/nmr_structure/8if5/8if5.cif.out.canon.gz",
+        "ps": "test/golden_na/mmcif/nmr_structure/8if5/8if5.cif.ps.canon.gz",
+        "wrl": "test/golden_na/mmcif/nmr_structure/8if5/8if5.cif.wrl.canon.gz",
+        "xml": "test/golden_na/mmcif/nmr_structure/8if5/8if5.cif.xml.canon.gz"
+      },
+      "status": "ok"
+    },
+    {
+      "error": null,
+      "input": "test/mmcif/x-ray/3P4J/assembly-1/3p4j-assembly1.cif",
+      "input_sha256": "2047c2e179e323c0fbdc9c6b38aa82d0ad2c98a077a513acb0770217d4cc4ea2",
+      "job_id": "3p4j-assembly1__b85dbf8c",
+      "outputs": {
+        "core": "test/golden_na/mmcif/x-ray/3P4J/assembly-1/3p4j-assembly1.cif.core.json",
+        "out": "test/golden_na/mmcif/x-ray/3P4J/assembly-1/3p4j-assembly1.cif.out.canon.gz",
+        "ps": "test/golden_na/mmcif/x-ray/3P4J/assembly-1/3p4j-assembly1.cif.ps.canon.gz",
+        "wrl": "test/golden_na/mmcif/x-ray/3P4J/assembly-1/3p4j-assembly1.cif.wrl.canon.gz",
+        "xml": "test/golden_na/mmcif/x-ray/3P4J/assembly-1/3p4j-assembly1.cif.xml.canon.gz"
+      },
+      "status": "ok"
+    },
+    {
+      "error": null,
+      "input": "test/pdb/pdb1nvy/pdb1nvy.pdb",
+      "input_sha256": "3d53e3167aa61bd3ab6e507c5de442f166f1abf469b8a3f167c940ad7bb97284",
+      "job_id": "pdb1nvy__e8092531",
+      "outputs": {
+        "core": "test/golden_na/pdb/pdb1nvy/pdb1nvy.pdb.core.json",
+        "out": "test/golden_na/pdb/pdb1nvy/pdb1nvy.pdb.out.canon.gz",
+        "ps": "test/golden_na/pdb/pdb1nvy/pdb1nvy.pdb.ps.canon.gz",
+        "wrl": "test/golden_na/pdb/pdb1nvy/pdb1nvy.pdb.wrl.canon.gz",
+        "xml": "test/golden_na/pdb/pdb1nvy/pdb1nvy.pdb.xml.canon.gz"
       },
       "status": "ok"
     }
@@ -27,6 +69,7 @@
     "wrl",
     "xml"
   ],
+  "reviewed_cases_manifest": "test/science_dna_cases.json",
   "schema_version": 1,
   "semantics": "science-v1"
 }

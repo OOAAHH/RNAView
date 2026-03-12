@@ -2,7 +2,7 @@ use crate::legacy_alg::{compute_base_info, AtomName4, ResName3};
 use crate::legacy_pairing::{all_pairs, bp_network_multiplets, pair_type_statistics, uncommon_lines};
 use crate::out_full::{OutEol, OutFull};
 use crate::structure::parse_structure_bases_with_atoms_with_policies;
-use crate::StructurePolicies;
+use crate::{ChemistryPolicies, StructurePolicies};
 use std::path::Path;
 
 #[derive(Debug, Clone)]
@@ -18,6 +18,7 @@ pub(crate) struct LegacyArrays {
     pub(crate) resname: Vec<ResName3>,    // 1-based (legacy field)
     pub(crate) bseq: Vec<u8>,             // 1-based
     pub(crate) ry: Vec<i32>,              // 1-based
+    pub(crate) sugar_class: Vec<u8>,      // 1-based: 0 unknown, 1 ribose, 2 deoxyribose
 }
 
 fn atom_name_field_legacy(name: &str) -> AtomName4 {
@@ -61,11 +62,13 @@ pub(crate) fn build_legacy_arrays(path: &Path, structure_policies: &StructurePol
 
     let mut bseq: Vec<u8> = vec![b'?'; num_residue + 1];
     let mut ry: Vec<i32> = vec![-1; num_residue + 1];
+    let mut sugar_class: Vec<u8> = vec![0; num_residue + 1];
 
     for (idx0, residue) in residues.iter().enumerate() {
         let i = idx0 + 1;
         bseq[i] = residue.base as u8;
         ry[i] = residue.ry;
+        sugar_class[i] = residue.sugar_class.legacy_code();
 
         let start = atom_name.len();
         let resname3 = residue_name_field_legacy(&residue.resname);
@@ -94,6 +97,7 @@ pub(crate) fn build_legacy_arrays(path: &Path, structure_policies: &StructurePol
         resname,
         bseq,
         ry,
+        sugar_class,
     })
 }
 
@@ -101,6 +105,7 @@ pub(crate) fn compute_out_full_from_structure(
     input_path: &Path,
     pdb_data_file_name: String,
     structure_policies: &StructurePolicies,
+    chemistry_policies: Option<&ChemistryPolicies>,
 ) -> Result<OutFull, String> {
     let arrays = build_legacy_arrays(input_path, structure_policies).map_err(|e| e.to_string())?;
     let base_info = compute_base_info(
@@ -135,6 +140,8 @@ pub(crate) fn compute_out_full_from_structure(
         &arrays.chain_id,
         &arrays.resseq,
         &arrays.bseq,
+        &arrays.sugar_class,
+        chemistry_policies,
     )?;
 
     let multiplets = bp_network_multiplets(
@@ -146,11 +153,13 @@ pub(crate) fn compute_out_full_from_structure(
         &arrays.resseq,
         &arrays.xyz,
         &arrays.bseq,
+        &arrays.sugar_class,
         &all.pair_info,
         &base_info.nxyz,
         &base_info.orien,
         &base_info.org,
         &base_info.bprs,
+        chemistry_policies,
     )?;
     let has_multiplets = multiplets.is_some();
 

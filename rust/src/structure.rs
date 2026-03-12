@@ -3,6 +3,7 @@ use pdbtbx::{
     Format, ReadOptions, StrictnessLevel,
 };
 use crate::semantics::{ChainIdPolicy, HydrogenPolicy, MissingInsertionCodePolicy, StructurePolicies};
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 
@@ -12,6 +13,32 @@ pub struct BaseResidue {
     pub resseq: i32,
     pub insertion_code: Option<char>,
     pub base: char,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PolymerClass {
+    Rna,
+    Dna,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SugarClass {
+    Ribose,
+    Deoxyribose,
+    Unknown,
+}
+
+impl SugarClass {
+    pub const fn legacy_code(self) -> u8 {
+        match self {
+            Self::Unknown => 0,
+            Self::Ribose => 1,
+            Self::Deoxyribose => 2,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -33,11 +60,16 @@ pub(crate) struct AtomRec {
 #[derive(Debug, Clone)]
 pub(crate) struct ResidueAtoms {
     pub chain: char,
+    pub chain_full: String,
     pub resseq: i32,
     pub insertion_code: Option<char>,
     pub resname: String,
+    pub raw_resname: String,
     pub ry: i32,
     pub base: char,
+    pub polymer_class: PolymerClass,
+    pub sugar_class: SugarClass,
+    pub is_modified: bool,
     pub atoms: Vec<AtomRec>,
 }
 
@@ -185,17 +217,7 @@ fn build_chain_id_map<'a>(
 }
 
 fn canonical_residue_name(raw: &str) -> String {
-    let s = raw.trim().to_ascii_uppercase();
-    if s.len() == 2 && s.starts_with('D') {
-        let mut chars = s.chars();
-        let _ = chars.next();
-        if let Some(second) = chars.next() {
-            if matches!(second, 'A' | 'T' | 'G' | 'C') {
-                return second.to_string();
-            }
-        }
-    }
-    s
+    raw.trim().to_ascii_uppercase()
 }
 
 fn dist(a: [f64; 3], b: [f64; 3]) -> f64 {
@@ -276,17 +298,69 @@ fn identify_uncommon(ry: i32, atoms: &[AtomRec]) -> char {
     '?'
 }
 
+fn is_standard_rna_resname(resname: &str) -> bool {
+    matches!(resname, "A" | "ADE" | "G" | "GUA" | "U" | "URA" | "C" | "CYT" | "I" | "INO")
+}
+
+fn is_standard_dna_resname(resname: &str) -> bool {
+    matches!(resname, "DA" | "DG" | "DC" | "DT" | "DI" | "T" | "THY")
+}
+
+fn legacy_resname_from_raw_resname(resname: &str) -> String {
+    match resname {
+        "DA" | "A" | "ADE" => "A".to_string(),
+        "DG" | "G" | "GUA" => "G".to_string(),
+        "DC" | "C" | "CYT" => "C".to_string(),
+        "DT" | "T" | "THY" => "T".to_string(),
+        "DU" | "U" | "URA" => "U".to_string(),
+        "DI" | "I" | "INO" => "I".to_string(),
+        "PSU" | "P" => "P".to_string(),
+        other => other.to_string(),
+    }
+}
+
 fn base_from_resname_or_infer(resname: &str, ry: i32, atoms: &[AtomRec]) -> char {
     match resname {
-        "A" | "ADE" => 'A',
-        "G" | "GUA" => 'G',
-        "U" | "URA" => 'U',
-        "C" | "CYT" => 'C',
-        "T" | "THY" => 'T',
-        "I" | "INO" => 'I',
+        "DA" | "A" | "ADE" => 'A',
+        "DG" | "G" | "GUA" => 'G',
+        "DU" | "U" | "URA" => 'U',
+        "DC" | "C" | "CYT" => 'C',
+        "DT" | "T" | "THY" => 'T',
+        "DI" | "I" | "INO" => 'I',
         "P" | "PSU" => 'P',
         _ => identify_uncommon(ry, atoms),
     }
+}
+
+fn classify_polymer_and_sugar(resname: &str, atoms: &[AtomRec]) -> (PolymerClass, SugarClass) {
+    match resname {
+        "DA" | "DG" | "DC" | "DT" | "DI" | "T" | "THY" => {
+            return (PolymerClass::Dna, SugarClass::Deoxyribose);
+        }
+        "A" | "ADE" | "G" | "GUA" | "C" | "CYT" | "U" | "URA" | "I" | "INO" | "P" | "PSU" => {
+            return (PolymerClass::Rna, SugarClass::Ribose);
+        }
+        _ => {}
+    }
+
+    if has_atom(atoms, "O2'") {
+        return (PolymerClass::Rna, SugarClass::Ribose);
+    }
+
+    let backbone_markers = ["C1'", "C2'", "C3'", "C4'", "O3'", "O4'"];
+    let has_backbone = backbone_markers.iter().any(|name| has_atom(atoms, name));
+    if has_backbone {
+        return (PolymerClass::Dna, SugarClass::Deoxyribose);
+    }
+
+    (PolymerClass::Unknown, SugarClass::Unknown)
+}
+
+fn is_modified_residue_name(resname: &str) -> bool {
+    !matches!(
+        resname,
+        "A" | "ADE" | "G" | "GUA" | "C" | "CYT" | "U" | "URA" | "I" | "INO" | "T" | "THY" | "DA" | "DG" | "DC" | "DT" | "DI"
+    )
 }
 
 pub(crate) fn parse_structure_nucleic_residues(
@@ -355,8 +429,8 @@ pub(crate) fn parse_structure_nucleic_residues_with_policies(
                 .and_then(|s| s.chars().next()),
             structure_policies.missing_insertion_code_policy,
         );
-        let resname = canonical_residue_name(h.conformer().name());
-        if resname == "HOH" || resname == "WAT" {
+        let raw_resname = canonical_residue_name(h.conformer().name());
+        if raw_resname == "HOH" || raw_resname == "WAT" {
             continue;
         }
 
@@ -364,7 +438,7 @@ pub(crate) fn parse_structure_nucleic_residues_with_policies(
             chain_id,
             resseq,
             insertion_code,
-            resname,
+            resname: raw_resname,
         };
         let serial = atom.serial_number();
         if apply_legacy_mmcif_h_bug_filter && legacy_mmcif_should_discard_h_atom(atom.name()) {
@@ -589,8 +663,8 @@ pub(crate) fn parse_structure_nucleic_residues_with_atoms_with_policies(
                 .and_then(|s| s.chars().next()),
             structure_policies.missing_insertion_code_policy,
         );
-        let resname = canonical_residue_name(h.conformer().name());
-        if resname == "HOH" || resname == "WAT" {
+        let raw_resname = canonical_residue_name(h.conformer().name());
+        if raw_resname == "HOH" || raw_resname == "WAT" {
             continue;
         }
 
@@ -598,7 +672,7 @@ pub(crate) fn parse_structure_nucleic_residues_with_atoms_with_policies(
             chain_id,
             resseq,
             insertion_code,
-            resname,
+            resname: raw_resname,
         };
         let serial = atom.serial_number();
         if apply_legacy_mmcif_h_bug_filter && legacy_mmcif_should_discard_h_atom(atom.name()) {
@@ -742,13 +816,22 @@ pub(crate) fn parse_structure_nucleic_residues_with_atoms_with_policies(
     let mut out: Vec<ResidueAtoms> = Vec::new();
     for (key, atoms, ry, base) in nucleic {
         let chain = chain_map.get(key.chain_id.as_str()).copied().unwrap_or(' ');
+        let raw_resname = key.resname;
+        let (polymer_class, sugar_class) = classify_polymer_and_sugar(&raw_resname, &atoms);
+        let legacy_resname = legacy_resname_from_raw_resname(&raw_resname);
+        let is_modified = is_modified_residue_name(&raw_resname);
         out.push(ResidueAtoms {
             chain,
+            chain_full: key.chain_id.clone(),
             resseq: key.resseq,
             insertion_code: key.insertion_code,
-            resname: key.resname,
+            resname: legacy_resname,
+            raw_resname,
             ry,
             base,
+            polymer_class,
+            sugar_class,
+            is_modified,
             atoms,
         });
     }
@@ -883,5 +966,59 @@ mod tests {
 
         let unique2 = build_chain_id_map(ids.iter().copied(), ChainIdPolicy::Unique1Char).expect("unique map 2");
         assert_eq!(unique, unique2, "unique mapping must be deterministic");
+    }
+
+    #[test]
+    fn raw_residue_name_is_preserved_while_legacy_name_is_collapsed() {
+        assert_eq!(canonical_residue_name("dt"), "DT");
+        assert_eq!(legacy_resname_from_raw_resname("DT"), "T");
+        assert_eq!(legacy_resname_from_raw_resname("DA"), "A");
+        assert_eq!(legacy_resname_from_raw_resname("PSU"), "P");
+    }
+
+    #[test]
+    fn base_inference_understands_standard_dna_residue_names() {
+        let atoms = vec![
+            AtomRec { name: "N1".to_string(), x: 0.0, y: 0.0, z: 0.0 },
+            AtomRec { name: "C2".to_string(), x: 1.3, y: 0.0, z: 0.0 },
+            AtomRec { name: "C6".to_string(), x: -1.3, y: 0.0, z: 0.0 },
+        ];
+        assert_eq!(base_from_resname_or_infer("DA", 0, &atoms), 'A');
+        assert_eq!(base_from_resname_or_infer("DT", 0, &atoms), 'T');
+        assert_eq!(base_from_resname_or_infer("DC", 0, &atoms), 'C');
+        assert_eq!(base_from_resname_or_infer("DG", 1, &atoms), 'G');
+    }
+
+    #[test]
+    fn polymer_classifier_uses_explicit_names_before_atom_fallback() {
+        let dna_atoms = vec![
+            AtomRec { name: "C1'".to_string(), x: 0.0, y: 0.0, z: 0.0 },
+            AtomRec { name: "C2'".to_string(), x: 0.0, y: 0.0, z: 0.0 },
+        ];
+        let rna_atoms = vec![
+            AtomRec { name: "C1'".to_string(), x: 0.0, y: 0.0, z: 0.0 },
+            AtomRec { name: "O2'".to_string(), x: 0.0, y: 0.0, z: 0.0 },
+        ];
+
+        assert_eq!(
+            classify_polymer_and_sugar("DT", &rna_atoms),
+            (PolymerClass::Dna, SugarClass::Deoxyribose)
+        );
+        assert_eq!(
+            classify_polymer_and_sugar("PSU", &rna_atoms),
+            (PolymerClass::Rna, SugarClass::Ribose)
+        );
+        assert_eq!(
+            classify_polymer_and_sugar("XAA", &dna_atoms),
+            (PolymerClass::Dna, SugarClass::Deoxyribose)
+        );
+    }
+
+    #[test]
+    fn modified_flag_distinguishes_standard_and_modified_residues() {
+        assert!(!is_modified_residue_name("DT"));
+        assert!(!is_modified_residue_name("A"));
+        assert!(is_modified_residue_name("PSU"));
+        assert!(is_modified_residue_name("1MG"));
     }
 }

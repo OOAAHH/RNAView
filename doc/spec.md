@@ -180,7 +180,7 @@ Rust (Hot Core Engine)
 
 - `Base`
   - `letter: str`（单字符，保持 legacy 语义：可大写/小写）
-    - DNA/hybrid：`T` 需要在输出中保留为 `T`（不强行归一成 `U`）；但分类逻辑上 `U/T` 视为等价（同一套 LW edge/顺反判定）
+    - DNA：`T` 需要在输出中保留为 `T`（不强行归一成 `U`）；`science-v1` 的 chemistry catalog 允许 `T/U` 在共享规则处复用，但不能再把两者当成完全同一残基
   - `resname: str`（3-letter，如 `PSU`）
   - `is_modified: bool`（从 letter 大小写/映射来源推导）
 
@@ -302,19 +302,20 @@ Gate C 用于把 “science-v1 相对 legacy-v1 的差异” 做可落盘、可�
 - 回归验收脚本：`bash test_phase3_science.sh`
   - 对 `--semantics science-v1` 的 core 做回归（不比较 `.out` bytes）。
 
-#### 3.3.6 Gate NA（DNA/RNA hybrid：science-v1 self-oracle）
+#### 3.3.6 Gate NA（DNA-inclusive：science-v1 reviewed regression）
 
-对于 **含 DNA 链的结构**（DNA/RNA hybrid、prot‑DNA‑RNA 等），本仓库不要求 legacy C 具备“科学上正确”的分析能力，因此无法用 legacy 作为 oracle 做 byte‑exact/canonical 回归。为避免这部分场景成为“无回归覆盖的盲区”，引入 Gate NA：
+对于 **含 DNA 链的结构**（pure DNA、DNA/RNA hybrid、prot‑DNA、prot‑DNA‑RNA），本仓库不要求 legacy C 具备“科学上正确”的分析能力，因此无法用 legacy 作为 oracle 做 byte‑exact/canonical 回归。为避免这部分场景成为“无回归覆盖的盲区”，引入 Gate NA：
 
 - baseline：`science-v1`
-- 验收形式：**self-oracle**（冻结一份 `science-v1` 输出作为 golden；后续比较当前输出 vs frozen golden）
-- 回归集：`test/hybrid/**`
-- golden：`test/golden_na/**`（包含 `core` + `.out/.xml/.ps/.wrl` 的 canonical 形式）
+- 验收形式：**reviewed golden**（先在 `test/science_dna_cases.json` 中登记并审阅 case，再冻结一份 `science-v1` 输出作为 golden；后续比较当前输出 vs frozen golden）
+- 回归集：`test/science_dna_cases.json` 中 `validation_status=approved` 的输入
+- golden：`test/golden_na/**`（包含 `core` + `.out/.xml/.ps/.wrl`；`core` 需要包含 DNA-aware 的 `residues[]` 元数据）
+- allowlist：`test/gate_na_allowlist.yaml`（存放已批准 diff event id；冻结前允许受控漂移，冻结后 CI 仅允许 approved diff）
 - 工具/脚本：
   - 回归：`bash test_phase4_gate_na.sh`
-  - 冻结/维护：`python3 tools/rnaview_gate_na.py freeze test/hybrid`
+  - 冻结/维护：`python3 tools/rnaview_gate_na.py freeze --cases-manifest test/science_dna_cases.json`
 
-> 注：Gate NA 的目标是“稳定性/可回归”，而不是“对齐 legacy”。当后续需要引入科学修复（例如更完整的 chain id 处理、纯 DNA 支持等），应先在 Gate C/新的 allowlist 体系中解释差异，再更新 Gate NA golden。
+> 注：Gate NA 的目标是“稳定性/可回归”，而不是“对齐 legacy”。当后续需要引入科学修复（例如更完整的 chain id 处理、DNA 专属 chemistry 调整等），应先在 Gate C/NA allowlist 体系中解释差异，再更新 Gate NA golden。
 
 ### 3.4 批处理（第一阶段）建议的外部接口契约
 

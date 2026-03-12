@@ -9,6 +9,8 @@ export RNAVIEW="$ROOT"
 OUT_DIR="${OUT_DIR:-out_phase4_gate_na}"
 SEMANTICS="${SEMANTICS:-science-v1}"
 GOLDEN_DIR="${GOLDEN_DIR:-test/golden_na}"
+CASES_MANIFEST="${CASES_MANIFEST:-test/science_dna_cases.json}"
+ALLOWLIST="${ALLOWLIST:-test/gate_na_allowlist.yaml}"
 
 # Ensure hotcore exists (Gate NA is self-oracle; no legacy/C required).
 if [[ ! -x "$ROOT/rust/target/release/rnaview-hotcore" && ! -x "$ROOT/rust/target/debug/rnaview-hotcore" ]]; then
@@ -19,8 +21,8 @@ python3 tools/rnaview_gate_na.py compare \
   --out-dir "$OUT_DIR" \
   --golden-dir "$GOLDEN_DIR" \
   --semantics "$SEMANTICS" \
-  test/hybrid
+  --cases-manifest "$CASES_MANIFEST" \
+  --allowlist "$ALLOWLIST"
 
 echo "Gate NA report: $OUT_DIR/report.md"
 echo "Gate NA summary: $OUT_DIR/summary.json"
-

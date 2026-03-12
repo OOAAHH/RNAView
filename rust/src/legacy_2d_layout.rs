@@ -32,6 +32,7 @@ pub(crate) struct Layout2d {
 pub(crate) fn compute_layout_2d(
     num_residue: usize,
     bseq: &[u8],
+    sugar_class: &[u8],
     seidx: &[[usize; 3]],
     ry: &[i32],
     atom_name: &[AtomName4],
@@ -80,6 +81,7 @@ pub(crate) fn compute_layout_2d(
             ry,
             &matched_idx,
             bseq,
+            sugar_class,
             seidx,
             xyz,
             &base_info.nxyz,
@@ -97,6 +99,7 @@ pub(crate) fn compute_layout_2d(
             ry,
             &matched_idx,
             bseq,
+            sugar_class,
             seidx,
             xyz,
             &base_info.nxyz,
@@ -225,6 +228,7 @@ fn best_pair(
     ry: &[i32],
     matched_idx: &[i64],
     bseq: &[u8],
+    sugar_class: &[u8],
     seidx: &[[usize; 3]],
     xyz: &[[f64; 4]],
     nxyz: &[[f64; 4]],
@@ -255,6 +259,7 @@ fn best_pair(
             i,
             j,
             bseq,
+            sugar_class,
             seidx,
             xyz,
             nxyz,
@@ -264,6 +269,7 @@ fn best_pair(
             bprs,
             &mut rtn_val,
             0,
+            None,
         );
         if bpid == 0 {
             continue;

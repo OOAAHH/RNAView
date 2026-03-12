@@ -484,10 +484,23 @@ def _freeze_one(
 def _cmd_freeze(args: argparse.Namespace) -> int:
     repo = _repo_root()
     golden_dir = Path(args.golden_dir).resolve() if args.golden_dir else (repo / "test" / "golden_na")
+    cases_manifest_path: Path | None = None
+    if args.cases_manifest is not None:
+        cases_manifest_path = Path(args.cases_manifest).resolve()
+    else:
+        default_cases = repo / "test" / "science_dna_cases.json"
+        if default_cases.exists():
+            cases_manifest_path = default_cases
 
-    inputs = _collect_inputs(list(args.inputs), list(args.list_file or []))
+    if args.inputs or args.list_file:
+        inputs = _collect_inputs(list(args.inputs), list(args.list_file or []))
+    elif cases_manifest_path is not None:
+        approved_inputs = sorted(_approved_inputs_from_cases_manifest(repo, cases_manifest_path))
+        inputs = [(repo / rel).resolve() for rel in approved_inputs]
+    else:
+        inputs = []
     if not inputs:
-        raise RuntimeError("no inputs selected")
+        raise RuntimeError("no inputs selected (pass inputs or provide --cases-manifest with approved entries)")
 
     semantics = str(args.semantics).strip()
     if semantics not in ("science-v1",):
@@ -528,6 +541,7 @@ def _cmd_freeze(args: argparse.Namespace) -> int:
     manifest = {
         "schema_version": 1,
         "semantics": semantics,
+        "reviewed_cases_manifest": _relpath(repo, cases_manifest_path) if cases_manifest_path else None,
         "formats": sorted(formats),
         "counts": {"ok": ok, "failed": failed},
         "elapsed_ms": int((time.time() - started) * 1000),
@@ -562,9 +576,11 @@ def _cmd_freeze(args: argparse.Namespace) -> int:
 class CompareResult:
     input: str
     job_id: str
-    status: str  # ok|changed|failed
+    status: str  # ok|changed|unapproved|failed
     error: str | None
     diffs: dict[str, list[str]] | None
+    events: list[dict[str, Any]] | None = None
+    unapproved_ids: list[str] | None = None
 
 
 def _load_manifest(path: Path) -> dict[str, Any]:
@@ -574,12 +590,84 @@ def _load_manifest(path: Path) -> dict[str, Any]:
     return data
 
 
+def _load_cases_manifest(path: Path) -> dict[str, Any]:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise RuntimeError("invalid cases manifest JSON")
+    return data
+
+
+def _approved_inputs_from_cases_manifest(repo: Path, path: Path) -> set[str]:
+    data = _load_cases_manifest(path)
+    out: set[str] = set()
+    for entry in data.get("entries") or []:
+        if not isinstance(entry, dict):
+            continue
+        if str(entry.get("validation_status") or "").strip().lower() != "approved":
+            continue
+        input_rel = entry.get("input")
+        if not isinstance(input_rel, str) or not input_rel.strip():
+            continue
+        out.add(_relpath(repo, (repo / input_rel).resolve()))
+    return out
+
+
+def _load_allowlist(path: Path | None) -> set[str]:
+    if path is None or not path.exists():
+        return set()
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise RuntimeError(f"invalid allowlist JSON: {path}")
+    approved = data.get("approved") or []
+    out: set[str] = set()
+    for entry in approved:
+        if isinstance(entry, dict):
+            item = str(entry.get("id") or "").strip()
+            if item:
+                out.add(item)
+    return out
+
+
+def _diff_event_id(input_rel: str, fmt: str, golden_canon: bytes, candidate_canon: bytes) -> str:
+    h = hashlib.sha1()
+    h.update(golden_canon)
+    h.update(b"\0")
+    h.update(candidate_canon)
+    return f"{input_rel}|{fmt}|{h.hexdigest()[:16]}"
+
+
+def _read_golden_canonical(*, fmt: str, path: Path) -> bytes:
+    if path.suffix == ".gz":
+        return _gzip_read(path)
+    return _canonicalize_text(raw=path.read_bytes(), fmt=fmt)
+
+
 def _cmd_compare(args: argparse.Namespace) -> int:
     repo = _repo_root()
     golden_dir = Path(args.golden_dir).resolve() if args.golden_dir else (repo / "test" / "golden_na")
     manifest_path = golden_dir / "manifest.json"
     if not manifest_path.exists():
         raise RuntimeError(f"missing golden manifest: {manifest_path}")
+    allowlist_path: Path | None = None
+    if args.allowlist is not None:
+        allowlist_path = Path(args.allowlist).resolve()
+    else:
+        default_allowlist = repo / "test" / "gate_na_allowlist.yaml"
+        if default_allowlist.exists():
+            allowlist_path = default_allowlist
+
+    cases_manifest_path: Path | None = None
+    if args.cases_manifest is not None:
+        cases_manifest_path = Path(args.cases_manifest).resolve()
+    else:
+        default_cases = repo / "test" / "science_dna_cases.json"
+        if default_cases.exists():
+            cases_manifest_path = default_cases
+
+    allow_ids = _load_allowlist(allowlist_path)
+    approved_inputs: set[str] = set()
+    if cases_manifest_path is not None:
+        approved_inputs = _approved_inputs_from_cases_manifest(repo, cases_manifest_path)
 
     manifest = _load_manifest(manifest_path)
     semantics = str(args.semantics).strip() if args.semantics else str(manifest.get("semantics") or "science-v1")
@@ -591,6 +679,8 @@ def _cmd_compare(args: argparse.Namespace) -> int:
         raise RuntimeError("manifest is missing formats")
 
     entries = [e for e in (manifest.get("entries") or []) if isinstance(e, dict)]
+    if approved_inputs:
+        entries = [e for e in entries if str(e.get("input") or "") in approved_inputs]
     if not entries:
         raise RuntimeError("manifest has no entries")
 
@@ -612,7 +702,18 @@ def _cmd_compare(args: argparse.Namespace) -> int:
 
     started = time.time()
     results: list[CompareResult] = []
-    counts = {"ok": 0, "changed": 0, "failed": 0}
+    counts = {"ok": 0, "changed": 0, "unapproved": 0, "failed": 0}
+
+    def fail_case(input_rel: str, job_id: str, error: str) -> CompareResult:
+        return CompareResult(
+            input=input_rel,
+            job_id=job_id,
+            status="failed",
+            error=error,
+            diffs=None,
+            events=None,
+            unapproved_ids=None,
+        )
 
     for entry in entries:
         input_rel = str(entry.get("input") or "")
@@ -623,86 +724,177 @@ def _cmd_compare(args: argparse.Namespace) -> int:
         input_path = (repo / input_rel).resolve() if input_rel else None
         if input_path is None or not input_path.exists():
             counts["failed"] += 1
-            results.append(CompareResult(input=input_rel, job_id=job_id, status="failed", error="missing input", diffs=None))
+            results.append(fail_case(input_rel, job_id, "missing input"))
             continue
 
         outputs = entry.get("outputs") or {}
         if not isinstance(outputs, dict):
             counts["failed"] += 1
-            results.append(
-                CompareResult(input=input_rel, job_id=job_id, status="failed", error="manifest missing outputs", diffs=None)
-            )
+            results.append(fail_case(input_rel, job_id, "manifest missing outputs"))
             continue
 
         try:
             produced = _run_hotcore_pipeline(repo=repo, rust_bin=rust_bin, input_path=input_path, semantics=semantics)
         except Exception as e:  # noqa: BLE001
             counts["failed"] += 1
-            results.append(CompareResult(input=input_rel, job_id=job_id, status="failed", error=str(e), diffs=None))
+            results.append(fail_case(input_rel, job_id, str(e)))
             continue
 
         diffs_by_fmt: dict[str, list[str]] = {}
-        changed = False
+        events: list[dict[str, Any]] = []
+        unapproved_ids: list[str] = []
+
+        def record_diff(fmt: str, *, golden_canon: bytes, candidate_canon: bytes, diff_lines: list[str]) -> None:
+            ident = _diff_event_id(input_rel, fmt, golden_canon, candidate_canon)
+            approved = ident in allow_ids
+            events.append(
+                {
+                    "id": ident,
+                    "format": fmt,
+                    "approved": approved,
+                    "diff": diff_lines,
+                }
+            )
+            if not approved:
+                unapproved_ids.append(ident)
+
+        case_failed = False
 
         if "core" in formats:
             golden_core_path = outputs.get("core")
             if not isinstance(golden_core_path, str) or not golden_core_path:
-                diffs_by_fmt["core"] = ["missing golden core path in manifest"]
-                changed = True
+                counts["failed"] += 1
+                results.append(fail_case(input_rel, job_id, "manifest missing outputs.core"))
+                case_failed = True
             else:
                 gp = Path(golden_core_path)
                 gp = (repo / gp).resolve() if not gp.is_absolute() else gp
-                golden_core = json.loads(gp.read_text(encoding="utf-8", errors="replace"))
-                golden_core = _canonical_core_for_regress(golden_core)
-                if produced.core != golden_core:
-                    changed = True
-                    a = _json_dumps(golden_core, indent=2)
-                    b = _json_dumps(produced.core, indent=2)
-                    diffs_by_fmt["core"] = _unified_diff(a, b, fromfile="golden.core.json", tofile="candidate.core.json", max_lines=int(args.max_diff_lines))
+                if not gp.exists():
+                    counts["failed"] += 1
+                    results.append(fail_case(input_rel, job_id, f"missing golden core: {golden_core_path}"))
+                    case_failed = True
+                else:
+                    golden_core = json.loads(gp.read_text(encoding="utf-8", errors="replace"))
+                    golden_core = _canonical_core_for_regress(golden_core)
+                    if produced.core != golden_core:
+                        golden_text = _json_dumps(golden_core, indent=2)
+                        candidate_text = _json_dumps(produced.core, indent=2)
+                        diff_lines = _unified_diff(
+                            golden_text,
+                            candidate_text,
+                            fromfile="golden.core.json",
+                            tofile="candidate.core.json",
+                            max_lines=int(args.max_diff_lines),
+                        )
+                        diffs_by_fmt["core"] = diff_lines
+                        record_diff(
+                            "core",
+                            golden_canon=golden_text.encode("utf-8"),
+                            candidate_canon=candidate_text.encode("utf-8"),
+                            diff_lines=diff_lines,
+                        )
+                        (case_dir / "golden.core.json").write_text(golden_text, encoding="utf-8")
+                        (case_dir / "candidate.core.json").write_text(candidate_text, encoding="utf-8")
 
-        def compare_gz(fmt: str, raw: bytes) -> None:
-            nonlocal changed
+        if case_failed:
+            continue
+
+        def compare_artifact(fmt: str, raw: bytes) -> str | None:
             golden_path = outputs.get(fmt)
             if not isinstance(golden_path, str) or not golden_path:
-                diffs_by_fmt[fmt] = [f"missing golden {fmt} path in manifest"]
-                changed = True
-                return
+                return f"manifest missing outputs.{fmt}"
             gp = Path(golden_path)
             gp = (repo / gp).resolve() if not gp.is_absolute() else gp
-            golden_canon = _gzip_read(gp)
+            if not gp.exists():
+                return f"missing golden {fmt}: {golden_path}"
+            golden_canon = _read_golden_canonical(fmt=fmt, path=gp)
             cand_canon = _canonicalize_text(raw=raw, fmt=fmt)
             if cand_canon != golden_canon:
-                changed = True
-                diffs_by_fmt[fmt] = _unified_diff(
+                diff_lines = _unified_diff(
                     golden_canon.decode("utf-8", errors="replace"),
                     cand_canon.decode("utf-8", errors="replace"),
                     fromfile=f"golden.{fmt}",
                     tofile=f"candidate.{fmt}",
                     max_lines=int(args.max_diff_lines),
                 )
+                diffs_by_fmt[fmt] = diff_lines
+                record_diff(fmt, golden_canon=golden_canon, candidate_canon=cand_canon, diff_lines=diff_lines)
                 (case_dir / f"candidate.{fmt}").write_bytes(raw)
                 (case_dir / f"candidate.{fmt}.canon").write_bytes(cand_canon)
                 (case_dir / f"golden.{fmt}.canon").write_bytes(golden_canon)
+            return None
 
-        if "out" in formats:
-            compare_gz("out", produced.out_bytes)
-        if "ps" in formats:
-            compare_gz("ps", produced.ps_bytes)
-        if "xml" in formats:
-            compare_gz("xml", produced.xml_bytes)
-        if "wrl" in formats:
-            compare_gz("wrl", produced.wrl_bytes)
+        for fmt, raw in (
+            ("out", produced.out_bytes),
+            ("ps", produced.ps_bytes),
+            ("xml", produced.xml_bytes),
+            ("wrl", produced.wrl_bytes),
+        ):
+            if fmt not in formats:
+                continue
+            error = compare_artifact(fmt, raw)
+            if error is not None:
+                counts["failed"] += 1
+                results.append(fail_case(input_rel, job_id, error))
+                case_failed = True
+                break
+        if case_failed:
+            continue
 
-        if changed:
+        diff_path = case_dir / "diff.json"
+        diff_path.write_text(_json_dumps({"schema_version": 1, "events": events}, indent=2), encoding="utf-8")
+
+        if unapproved_ids:
+            counts["unapproved"] += 1
+            results.append(
+                CompareResult(
+                    input=input_rel,
+                    job_id=job_id,
+                    status="unapproved",
+                    error=None,
+                    diffs=diffs_by_fmt,
+                    events=events,
+                    unapproved_ids=unapproved_ids,
+                )
+            )
+        elif events:
             counts["changed"] += 1
-            results.append(CompareResult(input=input_rel, job_id=job_id, status="changed", error=None, diffs=diffs_by_fmt))
+            results.append(
+                CompareResult(
+                    input=input_rel,
+                    job_id=job_id,
+                    status="changed",
+                    error=None,
+                    diffs=diffs_by_fmt,
+                    events=events,
+                    unapproved_ids=[],
+                )
+            )
         else:
             counts["ok"] += 1
-            results.append(CompareResult(input=input_rel, job_id=job_id, status="ok", error=None, diffs=None))
+            results.append(
+                CompareResult(
+                    input=input_rel,
+                    job_id=job_id,
+                    status="ok",
+                    error=None,
+                    diffs=None,
+                    events=[],
+                    unapproved_ids=[],
+                )
+            )
+
+    results.sort(key=lambda r: (r.status, r.input))
 
     summary = {
         "schema_version": 1,
         "semantics": semantics,
+        "baseline_manifest": _relpath(repo, manifest_path),
+        "reviewed_cases_manifest": _relpath(repo, cases_manifest_path) if cases_manifest_path else None,
+        "allowlist": {
+            "path": _relpath(repo, allowlist_path) if allowlist_path else None,
+            "approved_count": len(allow_ids),
+        },
         "counts": counts,
         "elapsed_ms": int((time.time() - started) * 1000),
         "out_dir": str(out_dir),
@@ -713,54 +905,68 @@ def _cmd_compare(args: argparse.Namespace) -> int:
                 "status": r.status,
                 "error": r.error,
                 "diffs": r.diffs,
+                "events": r.events,
+                "unapproved_ids": r.unapproved_ids,
             }
             for r in results
         ],
     }
     (out_dir / "summary.json").write_text(_json_dumps(summary, indent=2), encoding="utf-8")
 
-    # Markdown report
     lines: list[str] = []
-    lines.append("# Gate NA report (DNA/RNA hybrid, science-v1 self-oracle)")
+    lines.append("# Gate NA report (DNA-inclusive science-v1 reviewed regression)")
     lines.append("")
     lines.append(f"- semantics: `{semantics}`")
-    lines.append(f"- golden: `{_relpath(repo, golden_dir)}`")
+    lines.append(f"- baseline manifest: `{_relpath(repo, manifest_path)}`")
+    lines.append(f"- reviewed cases: `{_relpath(repo, cases_manifest_path) if cases_manifest_path else None}`")
+    lines.append(f"- allowlist: `{_relpath(repo, allowlist_path) if allowlist_path else None}`")
+    lines.append(f"- golden dir: `{_relpath(repo, golden_dir)}`")
     lines.append(f"- out_dir: `{_relpath(repo, out_dir)}`")
     lines.append(f"- counts: `{counts}`")
     lines.append("")
 
-    for r in results:
-        if r.status == "ok":
+    for bucket in ("failed", "unapproved", "changed"):
+        subset = [r for r in results if r.status == bucket]
+        if not subset:
             continue
-        lines.append(f"## {r.status}: {r.input}")
+        lines.append(f"## {bucket.title()}")
         lines.append("")
-        lines.append(f"- job_id: `{r.job_id}`")
-        if r.error:
-            lines.append(f"- error: `{r.error}`")
-        if r.diffs:
-            for fmt, diff_lines in r.diffs.items():
-                lines.append("")
-                lines.append(f"### diff: {fmt}")
-                lines.append("")
-                lines.append("```diff")
-                lines.extend(diff_lines)
-                lines.append("```")
+        for r in subset:
+            lines.append(f"- {bucket}: `{r.input}` job_id=`{r.job_id}` events={len(r.events or [])}")
+            if r.error:
+                lines.append(f"  error=`{r.error}`")
+            if r.unapproved_ids:
+                lines.append(f"  unapproved={r.unapproved_ids}")
         lines.append("")
+
+    for r in results:
+        if not r.diffs:
+            continue
+        lines.append(f"## Diffs: {r.input}")
+        lines.append("")
+        for fmt, diff_lines in r.diffs.items():
+            lines.append(f"### {fmt}")
+            lines.append("")
+            lines.append("```diff")
+            lines.extend(diff_lines)
+            lines.append("```")
+            lines.append("")
 
     (out_dir / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-    if counts["failed"] or counts["changed"]:
+    if counts["failed"] or counts["unapproved"]:
         return 1
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="Gate NA: DNA/RNA hybrid regression (science-v1 self-oracle)")
+    p = argparse.ArgumentParser(description="Gate NA: DNA-inclusive science-v1 reviewed regression")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    pf = sub.add_parser("freeze", help="Freeze science-v1 goldens for NA gate (core + out + render)")
-    pf.add_argument("inputs", nargs="+", help="Input files/dirs/globs")
+    pf = sub.add_parser("freeze", help="Freeze science-v1 goldens for the DNA-inclusive NA gate")
+    pf.add_argument("inputs", nargs="*", help="Input files/dirs/globs (default: approved entries from --cases-manifest)")
     pf.add_argument("--list-file", action="append", default=None, help="Read extra inputs from a list file")
+    pf.add_argument("--cases-manifest", default=None, help="Reviewed DNA cases manifest (default: test/science_dna_cases.json)")
     pf.add_argument("--golden-dir", default=None, help="Golden output dir (default: test/golden_na)")
     pf.add_argument("--semantics", default="science-v1", help="Semantics baseline (must be science-v1)")
     pf.add_argument("--formats", default="core,out,xml,ps,wrl", help="Comma-separated: core,out,xml,ps,wrl")
@@ -768,12 +974,14 @@ def main(argv: list[str] | None = None) -> int:
     pf.add_argument("--rust-bin", default=None, help="Path to rnaview-hotcore (default: auto-build/find)")
     pf.set_defaults(func=_cmd_freeze)
 
-    pc = sub.add_parser("compare", help="Compare current outputs against frozen goldens")
+    pc = sub.add_parser("compare", help="Compare current outputs against frozen DNA-inclusive goldens")
     pc.add_argument("--out-dir", default=None, help="Where to write the report (default: out_gate_na)")
     pc.add_argument("--golden-dir", default=None, help="Golden dir (default: test/golden_na)")
     pc.add_argument("--semantics", default=None, help="Semantics baseline override (default: from manifest)")
     pc.add_argument("--max-diff-lines", type=int, default=200, help="Max diff lines per format (default: 200)")
     pc.add_argument("--rust-bin", default=None, help="Path to rnaview-hotcore (default: auto-build/find)")
+    pc.add_argument("--cases-manifest", default=None, help="Reviewed DNA cases manifest (default: test/science_dna_cases.json)")
+    pc.add_argument("--allowlist", default=None, help="Allowlist path (default: test/gate_na_allowlist.yaml)")
     pc.add_argument("inputs", nargs="*", help="Optional filter: only compare these inputs")
     pc.add_argument("--list-file", action="append", default=None, help="Optional filter: list file of inputs to compare")
     pc.set_defaults(func=_cmd_compare)

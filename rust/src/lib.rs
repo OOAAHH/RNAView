@@ -16,13 +16,13 @@ mod legacy_xml2ps;
 mod render_2d;
 #[cfg(feature = "legacy-ffi")]
 mod legacy_ffi;
-pub use structure::{parse_structure_bases, BaseResidue};
+pub use structure::{parse_structure_bases, BaseResidue, PolymerClass, SugarClass};
 pub use out_full::{parse_out_full, write_out_full, OutEol, OutFull, OutBasePairLine, OutPairKind};
 pub use vrml_render::render_vrml_from_pairs_json;
 pub use render_2d::render_2d_from_pairs_json;
 pub use semantics::{
-    ChainIdPolicy, HydrogenPolicy, MissingInsertionCodePolicy, Policies, Semantics, SemanticsConfig,
-    StructurePolicies,
+    ChainIdPolicy, ChemistryPolicies, HydrogenPolicy, MissingInsertionCodePolicy, Policies,
+    Semantics, SemanticsConfig, StructurePolicies,
 };
 
 pub fn compute_out_full_from_structure(
@@ -41,7 +41,20 @@ pub fn compute_out_full_from_structure_with_policies(
     pdb_data_file_name: String,
     structure_policies: &StructurePolicies,
 ) -> Result<OutFull, String> {
-    noc_engine::compute_out_full_from_structure(input_path, pdb_data_file_name, structure_policies)
+    noc_engine::compute_out_full_from_structure(input_path, pdb_data_file_name, structure_policies, None)
+}
+
+pub fn compute_out_full_from_structure_with_config(
+    input_path: &std::path::Path,
+    pdb_data_file_name: String,
+    semantics_config: &SemanticsConfig,
+) -> Result<OutFull, String> {
+    noc_engine::compute_out_full_from_structure(
+        input_path,
+        pdb_data_file_name,
+        &semantics_config.policies.structure,
+        semantics_config.policies.chemistry.as_ref(),
+    )
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -68,6 +81,8 @@ pub struct PairsJson {
 pub struct Core {
     #[serde(default)]
     pub base_pairs: Vec<BasePair>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub residues: Vec<ResidueIdentityRecord>,
     #[serde(default)]
     pub multiplets: Vec<Multiplet>,
     #[serde(default)]
@@ -115,6 +130,75 @@ pub struct BasePair {
 pub struct Multiplet {
     pub indices: Vec<i32>,
     pub text: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResidueIdentityRecord {
+    pub index: i32,
+    pub chain: String,
+    pub chain_full: String,
+    pub resseq: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub insertion_code: Option<String>,
+    pub base: String,
+    pub resname: String,
+    pub polymer_class: PolymerClass,
+    pub sugar_class: SugarClass,
+    pub is_modified: bool,
+}
+
+pub fn science_residue_identity_records(
+    input_path: &Path,
+    structure_policies: &StructurePolicies,
+) -> std::io::Result<Vec<ResidueIdentityRecord>> {
+    let mut scientific_policies = structure_policies.clone();
+    scientific_policies.missing_insertion_code_policy = MissingInsertionCodePolicy::None;
+    let residues =
+        structure::parse_structure_bases_with_atoms_with_policies(input_path, &scientific_policies)?;
+    let mut out: Vec<ResidueIdentityRecord> = Vec::new();
+    for (idx0, residue) in residues.iter().enumerate() {
+        out.push(ResidueIdentityRecord {
+            index: (idx0 + 1) as i32,
+            chain: residue.chain.to_string(),
+            chain_full: residue.chain_full.clone(),
+            resseq: residue.resseq,
+            insertion_code: residue.insertion_code.map(|c| c.to_string()),
+            base: residue.base.to_string(),
+            resname: residue.raw_resname.clone(),
+            polymer_class: residue.polymer_class,
+            sugar_class: residue.sugar_class,
+            is_modified: residue.is_modified,
+        });
+    }
+    Ok(out)
+}
+
+pub fn attach_residue_identities_if_dna(core: &mut Core, residues: Vec<ResidueIdentityRecord>) {
+    let has_dna = residues
+        .iter()
+        .any(|r| r.polymer_class == PolymerClass::Dna);
+    if !has_dna {
+        return;
+    }
+
+    let mut residues = residues;
+    residues.sort_by(|a, b| {
+        (
+            a.index,
+            a.chain.as_str(),
+            a.chain_full.as_str(),
+            a.resseq,
+            a.resname.as_str(),
+        )
+            .cmp(&(
+                b.index,
+                b.chain.as_str(),
+                b.chain_full.as_str(),
+                b.resseq,
+                b.resname.as_str(),
+            ))
+    });
+    core.residues = residues;
 }
 
 fn norm_ws(text: &str) -> String {
@@ -423,6 +507,7 @@ fn extract_core_from_out_str_impl(text: &str, include_out_index: bool) -> Core {
 
     Core {
         base_pairs,
+        residues: Vec::new(),
         multiplets,
         stats: extract_stats(&raw_lines),
     }
@@ -740,5 +825,21 @@ mod tests {
 
         assert!(validated > 0, "no golden entries validated");
         assert!(validated + skipped == entries.len(), "lost entries during iteration");
+    }
+
+    #[test]
+    fn science_residue_identities_do_not_emit_legacy_missing_insertion_markers() {
+        let repo = repo_root();
+        let input = repo.join("test/mmcif/x-ray/3P4J/assembly-1/3p4j-assembly1.cif");
+        let structure_policies = SemanticsConfig::defaults(Semantics::ScienceV1).policies.structure;
+
+        let residues =
+            science_residue_identity_records(&input, &structure_policies).expect("parse science residue identities");
+
+        assert!(!residues.is_empty(), "expected residue identities for 3P4J");
+        assert!(
+            residues.iter().all(|r| r.insertion_code.is_none()),
+            "science residue identities should omit synthetic '?' insertion markers"
+        );
     }
 }

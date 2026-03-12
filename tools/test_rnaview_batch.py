@@ -1,5 +1,7 @@
+import errno
 import importlib.util
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -26,8 +28,20 @@ class TestBatchRunner(unittest.TestCase):
         cls.batch_mod = _load_module("rnaview_batch", cls.repo / "tools" / "rnaview_batch.py")
 
     def test_run_single_with_regress(self) -> None:
-        if not (self.repo / "bin" / "rnaview").exists():
+        legacy_bin = self.repo / "bin" / "rnaview"
+        if not legacy_bin.exists():
             self.skipTest("missing legacy binary: bin/rnaview")
+        try:
+            subprocess.run(
+                [str(legacy_bin)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+        except OSError as exc:
+            if exc.errno == errno.ENOEXEC:
+                self.skipTest("legacy binary is not runnable on this platform")
+            self.skipTest(f"legacy binary is not runnable: {exc}")
 
         inp = self.repo / "test" / "pdb" / "tr0001" / "tr0001.pdb"
         with tempfile.TemporaryDirectory() as td:

@@ -19,7 +19,7 @@
 - ✅ Gate D（legacy baseline + canonicalize + diff‑0）：`bash test_phase4_gate_d.sh`（CI candidate backend：`pairs-out-noc`；当前回归集 `ok=15, unapproved=0, failed=0`）
 - ✅ 2D No‑C（XML/PS）：Rust `render-2d` 已与 legacy golden 收敛并通过 Gate D；最后 3 个差异 case 的根因是 legacy `xml2ps.c` 在 `k1==99/999` 时不会输出序号 label（“缺口逻辑”），Rust 端已保持一致。
 - ✅ 3D No‑C（VRML）：Rust `render-wrl` 已通过 Gate D（同 `pairs-out-noc` backend）。
-- 🆕 Gate NA（DNA/RNA hybrid，science-v1 self-oracle）：`bash test_phase4_gate_na.sh`（基于 `test/hybrid/**`；golden 在 `test/golden_na/**`；当前回归集 `ok=1, failed=0`；不要求 legacy C 具备对 hybrid 的分析能力）
+- 🆕 Gate NA（DNA-inclusive，science-v1 reviewed regression）：`bash test_phase4_gate_na.sh`（基于 `test/science_dna_cases.json`；golden 在 `test/golden_na/**`；当前 reviewed 回归集包含 pure DNA + hybrid；不要求 legacy C 具备对 DNA case 的分析能力）
 
 ## 2. 交付版（v1）Definition of Done（建议）
 

@@ -29,6 +29,7 @@ pub fn render_2d_from_pairs_json(
     let layout = crate::legacy_2d_layout::compute_layout_2d(
         arrays.num_residue,
         &arrays.bseq,
+        &arrays.sugar_class,
         &arrays.seidx,
         &arrays.ry,
         &arrays.atom_name,

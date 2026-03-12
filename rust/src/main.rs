@@ -1,6 +1,7 @@
 use rnaview_hotcore::{
-    compute_out_full_from_structure_with_policies, extract_core_from_out_path_with_out_index,
-    extract_core_from_out_str_with_out_index, parse_structure_bases, render_vrml_from_pairs_json,
+    attach_residue_identities_if_dna, compute_out_full_from_structure_with_config,
+    extract_core_from_out_path_with_out_index, extract_core_from_out_str_with_out_index,
+    parse_structure_bases, render_vrml_from_pairs_json, science_residue_identity_records,
     write_out_core, write_out_full, BaseResidue, ChainIdPolicy, Core, HydrogenPolicy,
     MissingInsertionCodePolicy, PairsJson, Semantics, SemanticsConfig, Source,
 };
@@ -571,7 +572,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .transpose()
                     .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?
                     .unwrap_or(Semantics::LegacyV1);
-                let mut structure_policies = SemanticsConfig::defaults(semantics).policies.structure;
+                let mut semantics_config = SemanticsConfig::defaults(semantics);
+                let mut structure_policies = semantics_config.policies.structure.clone();
                 if let Some(s) = hydrogen_policy.as_deref() {
                     structure_policies.hydrogen_policy = HydrogenPolicy::parse_cli(s)
                         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
@@ -585,6 +587,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     structure_policies.chain_id_policy = ChainIdPolicy::parse_cli(s)
                         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
                 }
+                semantics_config.policies.structure = structure_policies.clone();
 
                 let root_opt = rnaview_root
                     .clone()
@@ -609,7 +612,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let pdb_data_file_name = format!("PDB data file name: {header_path}");
 
                 let out_full =
-                    compute_out_full_from_structure_with_policies(&input, pdb_data_file_name, &structure_policies)?;
+                    compute_out_full_from_structure_with_config(&input, pdb_data_file_name, &semantics_config)?;
                 let out_text = write_out_full(&out_full)
                     .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
@@ -617,7 +620,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     std::fs::write(dst, out_text.as_bytes())?;
                 }
 
-                let core: Core = extract_core_from_out_str_with_out_index(&out_text);
+                let mut core: Core = extract_core_from_out_str_with_out_index(&out_text);
+                if semantics == Semantics::ScienceV1 {
+                    let residues = science_residue_identity_records(&input, &structure_policies)?;
+                    attach_residue_identities_if_dna(&mut core, residues);
+                }
                 let pairs = PairsJson {
                     schema_version: 1,
                     source: Some(Source {
@@ -630,7 +637,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         "engine":"rust",
                         "oracle":"compute",
                         "semantics": semantics.as_str(),
-                        "policies": { "structure": structure_policies },
+                        "policies": semantics_config.policies,
                     })),
                     core,
                 };

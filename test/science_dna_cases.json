@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "manifest_source": "../pdb_rna_until_20260205_mmcif_manifest_clean.tsv",
+  "entries": [
+    {
+      "input": "test/pdb/pdb1nvy/pdb1nvy.pdb",
+      "category": "pure-dna",
+      "references": [
+        "PDB 1NVY",
+        "test/pdb/pdb1nvy/pdb1nvy.pdb"
+      ],
+      "review_notes": "Reviewed pure DNA duplex regression fixture. Frozen outputs cover core, legacy-style .out, and render artifacts under science-v1.",
+      "validation_status": "approved"
+    },
+    {
+      "input": "test/mmcif/x-ray/3P4J/assembly-1/3p4j-assembly1.cif",
+      "category": "pure-dna",
+      "references": [
+        "PDB 3P4J",
+        "test/mmcif/x-ray/3P4J/assembly-1/3p4j-assembly1.cif"
+      ],
+      "review_notes": "Reviewed Z-DNA pure DNA mmCIF fixture. All 12 nucleotides are explicitly annotated as DNA in the frozen core.residues[] metadata.",
+      "validation_status": "approved"
+    },
+    {
+      "input": "test/mmcif/nmr_structure/8if5/8if5.cif",
+      "category": "pure-dna",
+      "references": [
+        "PDB 8IF5",
+        "test/mmcif/nmr_structure/8if5/8if5.cif"
+      ],
+      "review_notes": "Reviewed NMR pure DNA fixture. Science-v1 preserves T output and, under the DNA-aware sugar-edge catalog, downgrades the 10_11 contact from a counted HS-cis pair to a tertiary !1H(b_b). annotation; the reviewed baseline therefore carries 11 counted base pairs and two multiplets.",
+      "validation_status": "approved"
+    },
+    {
+      "input": "test/hybrid/pdb1nvy_hybrid/pdb1nvy_dna_rna_hybrid.pdb",
+      "category": "dna-rna-hybrid",
+      "references": [
+        "test/hybrid/pdb1nvy_hybrid/pdb1nvy_dna_rna_hybrid.pdb",
+        "Derived from PDB 1NVY with RNA renaming on chain B residues 9-10"
+      ],
+      "review_notes": "Reviewed minimal DNA/RNA hybrid fixture. Frozen core.residues[] contains both DNA and RNA annotations.",
+      "validation_status": "approved"
+    },
+    {
+      "input": "",
+      "category": "prot-dna",
+      "references": [
+        "../pdb_rna_until_20260205_mmcif_manifest_clean.tsv"
+      ],
+      "review_notes": "Pending fixture selection. The available local external manifest is RNA-scoped and yielded zero downloaded has_dna+has_protein+no_rna rows in this checkout, so no reviewed protein-DNA mmCIF could be frozen locally.",
+      "validation_status": "pending-fixture"
+    },
+    {
+      "input": "",
+      "category": "prot-dna-rna",
+      "references": [
+        "PDB 1MSW",
+        "PDB 1QLN",
+        "../pdb_rna_until_20260205_mmcif_manifest_clean.tsv"
+      ],
+      "review_notes": "Pending fixture import. The external manifest lists protein-DNA-RNA candidates, but their /Volumes/sunhao/... mmCIF files are not mounted on this machine, so first-wave reviewed goldens cannot be frozen locally yet.",
+      "validation_status": "pending-fixture"
+    }
+  ]
+}

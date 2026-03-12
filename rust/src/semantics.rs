@@ -119,20 +119,39 @@ impl StructurePolicies {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChemistryPolicies {
+    pub residue_identity_policy: String,
+    pub edge_catalog_policy: String,
+}
+
+impl ChemistryPolicies {
+    pub fn science_v1_defaults() -> Self {
+        Self {
+            residue_identity_policy: "explicit-polymer-v1".to_string(),
+            edge_catalog_policy: "dna-aware-lw-v1".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Policies {
     pub structure: StructurePolicies,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chemistry: Option<ChemistryPolicies>,
 }
 
 impl Policies {
     pub const fn legacy_v1_defaults() -> Self {
         Self {
             structure: StructurePolicies::legacy_v1_defaults(),
+            chemistry: None,
         }
     }
 
-    pub const fn science_v1_defaults() -> Self {
+    pub fn science_v1_defaults() -> Self {
         Self {
             structure: StructurePolicies::science_v1_defaults(),
+            chemistry: Some(ChemistryPolicies::science_v1_defaults()),
         }
     }
 }
@@ -144,7 +163,7 @@ pub struct SemanticsConfig {
 }
 
 impl SemanticsConfig {
-    pub const fn defaults(semantics: Semantics) -> Self {
+    pub fn defaults(semantics: Semantics) -> Self {
         match semantics {
             Semantics::LegacyV1 => Self {
                 semantics,

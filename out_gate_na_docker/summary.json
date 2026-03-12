@@ -1,0 +1,56 @@
+{
+  "allowlist": {
+    "approved_count": 0,
+    "path": "test/gate_na_allowlist.yaml"
+  },
+  "baseline_manifest": "test/golden_na/manifest.json",
+  "counts": {
+    "changed": 0,
+    "failed": 0,
+    "ok": 4,
+    "unapproved": 0
+  },
+  "elapsed_ms": 720,
+  "out_dir": "/workspace/out_gate_na_docker",
+  "results": [
+    {
+      "diffs": null,
+      "error": null,
+      "events": [],
+      "input": "test/hybrid/pdb1nvy_hybrid/pdb1nvy_dna_rna_hybrid.pdb",
+      "job_id": "pdb1nvy_dna_rna_hybrid__dc397f61",
+      "status": "ok",
+      "unapproved_ids": []
+    },
+    {
+      "diffs": null,
+      "error": null,
+      "events": [],
+      "input": "test/mmcif/nmr_structure/8if5/8if5.cif",
+      "job_id": "8if5__20e53330",
+      "status": "ok",
+      "unapproved_ids": []
+    },
+    {
+      "diffs": null,
+      "error": null,
+      "events": [],
+      "input": "test/mmcif/x-ray/3P4J/assembly-1/3p4j-assembly1.cif",
+      "job_id": "3p4j-assembly1__b85dbf8c",
+      "status": "ok",
+      "unapproved_ids": []
+    },
+    {
+      "diffs": null,
+      "error": null,
+      "events": [],
+      "input": "test/pdb/pdb1nvy/pdb1nvy.pdb",
+      "job_id": "pdb1nvy__e8092531",
+      "status": "ok",
+      "unapproved_ids": []
+    }
+  ],
+  "reviewed_cases_manifest": "test/science_dna_cases.json",
+  "schema_version": 1,
+  "semantics": "science-v1"
+}
